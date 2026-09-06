@@ -90,7 +90,7 @@ The Edge call is a sibling registration so the existing meta package does not ac
 
 Supply Cloudflare and Varnish credentials through environment variables, user secrets, or another secret provider. Do not commit production credentials. The Cloudflare token must be able to purge cache content for its zone; a Varnish purge URL must be internal and protected by an ACL, mTLS, an authenticating proxy, or the configured API-key header.
 
-Edge TTL is independent of Output Cache, Data Cache, and browser TTLs. Cloudflare receives `Cloudflare-CDN-Cache-Control`; Varnish receives private origin-to-VCL headers. Neither provider replaces the ordinary browser `Cache-Control` header. The common model offers TTL, `stale-while-revalidate`, and `stale-if-error`, but each provider declares which stale semantics it can preserve and unsupported combinations fail startup validation. It intentionally omits `no-transform`, `s-maxage`, and arbitrary directives because their behavior is not safely portable and some combinations disable stale serving.
+Edge TTL is independent of Output Cache and Data Cache. It is normally also independent of browser TTL, but an active [Client Cache Schedule](client-cache-schedule.md) applies the same cutover date and client minimum TTL to the Edge fresh TTL. Edge keeps its configured `TtlSeconds` as its maximum, so its Approaching phase begins independently of the client phase. Cloudflare receives `Cloudflare-CDN-Cache-Control`; Varnish receives private origin-to-VCL headers. Neither provider replaces the ordinary browser `Cache-Control` header. The common model offers TTL, `stale-while-revalidate`, and `stale-if-error`, but each provider declares which stale semantics it can preserve and unsupported combinations fail startup validation. Edge stale windows are not changed by the schedule. It intentionally omits `no-transform`, `s-maxage`, and arbitrary directives because their behavior is not safely portable and some combinations disable stale serving.
 
 ## Response flow
 
@@ -116,6 +116,8 @@ All existing invalidation entry points continue to be authoritative. After local
 With `CacheOrchestrator.HttpBus`, only the process that initiated a runtime Version change or logical invalidation queues the external call. Peers still apply their local mutation, but remote application does not duplicate provider calls. Local-only Admin invalidation still invalidates the edge cache.
 
 Changing a domain `Version` through the Management/Admin API or configuration reload automatically enqueues a domain-tag purge when Edge is enabled for that domain. Configuration comparison is sequential and runs outside the request path. Each process observes its own configuration reload and may therefore enqueue the same idempotent purge in a multi-instance deployment.
+
+Changing `ClientCache:ScheduledUpdateUtc` does not enqueue a purge. It changes the TTL calculation for subsequent origin responses; existing Edge objects keep their stored TTL until expiry or independent invalidation. This is consistent for runtime changes, HttpBus peers, and configuration reload. Other Edge and Client Cache setting changes are also not policy-change purge triggers.
 
 When configuration changes Edge from enabled to disabled, removes the domain, or changes its instance, provider, or tag namespace, CacheOrchestrator purges the previous Edge placement. A simultaneous Version and placement change purges both the old placement and the new enabled placement. Edge-disabled domains do not purge for Version-only changes.
 

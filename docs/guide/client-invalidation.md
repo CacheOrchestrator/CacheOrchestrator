@@ -8,7 +8,7 @@ When a browser receives a response with a long `max-age`, it can reuse that resp
 
 First choose a client TTL that matches the acceptable age of the data. A long TTL suits a stable published catalog; frequently changing records usually need a shorter one. Server TTLs can remain different: CO configures each layer independently.
 
-For a planned publication, use **[Client Cache Schedule](client-cache-schedule.md)**. `ScheduledUpdateUtc`, `TtlSeconds`, and `TtlMinSeconds` reduce the client lifetime as the cutover approaches. This affects headers on responses being served; it cannot rewrite headers on copies already in the browser, and it does not publish data or invalidate server entries by itself.
+For a planned publication, use **[Client Cache Schedule](client-cache-schedule.md)**. `ScheduledUpdateUtc`, `TtlSeconds`, and `TtlMinSeconds` reduce the client lifetime as the cutover approaches and also reduce fresh TTL for an enabled CacheOrchestrator Edge integration. This affects metadata on responses being stored; it cannot rewrite headers on copies already in the browser or Edge, and it does not publish or purge data. Changing the scheduled date affects the next origin response.
 
 Unscheduled corrections and interactive applications still need a way to bypass browser cache or refresh application state. The following examples cover two cases:
 

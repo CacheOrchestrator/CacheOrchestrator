@@ -39,6 +39,65 @@ public class EdgeIntegrationTests
         provider.Metadata.Tags.Should().HaveCount(2).And.OnlyContain(tag => tag.StartsWith("coe1-"));
     }
 
+    [Theory]
+    [InlineData(601, 60, 600)]
+    [InlineData(300, 60, 300)]
+    [InlineData(30, 60, 60)]
+    [InlineData(-1, 60, 60)]
+    [InlineData(-1, 700, 600)]
+    [InlineData(-1, 0, 0)]
+    public async Task ResponseContributor_ClientScheduleControlsEdgeTtl(
+        int secondsUntilUpdate,
+        int minTtlSeconds,
+        int expectedEdgeTtlSeconds)
+    {
+        DateTimeOffset now = new(2030, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        TestProvider provider = new();
+        (EdgeResponseContributor sut, _, _) = Create(provider, new FixedTimeProvider(now));
+        var http = new DefaultHttpContext();
+        http.Request.Method = HttpMethods.Get;
+        var context = new CacheResponseContext(
+            http,
+            new DomainHttpCacheOptions
+            {
+                CoreOptions = new DomainCacheOptions { Domain = "catalog" },
+                ClientTtlSeconds = 3600,
+                ClientTtlMinSeconds = minTtlSeconds,
+                ScheduledUpdateUtc = now.AddSeconds(secondsUntilUpdate)
+            },
+            sharedCacheEligible: true,
+            ["domain:catalog"]);
+
+        await sut.ContributeAsync(context, TestContext.Current.CancellationToken);
+
+        provider.Metadata!.Ttl.Should().Be(TimeSpan.FromSeconds(expectedEdgeTtlSeconds));
+    }
+
+    [Fact]
+    public async Task ResponseContributor_ClientScheduleDisabled_RetainsConfiguredEdgeTtl()
+    {
+        DateTimeOffset now = new(2030, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        TestProvider provider = new();
+        (EdgeResponseContributor sut, _, _) = Create(provider, new FixedTimeProvider(now));
+        var http = new DefaultHttpContext();
+        http.Request.Method = HttpMethods.Get;
+        var context = new CacheResponseContext(
+            http,
+            new DomainHttpCacheOptions
+            {
+                CoreOptions = new DomainCacheOptions { Domain = "catalog" },
+                ClientTtlSeconds = 0,
+                ClientTtlMinSeconds = 0,
+                ScheduledUpdateUtc = now.AddSeconds(30)
+            },
+            sharedCacheEligible: true,
+            ["domain:catalog"]);
+
+        await sut.ContributeAsync(context, TestContext.Current.CancellationToken);
+
+        provider.Metadata!.Ttl.Should().Be(TimeSpan.FromSeconds(600));
+    }
+
     [Fact]
     public async Task ResponseContributor_WhenProviderBudgetExceeded_DisablesSharedCaching()
     {
@@ -321,7 +380,8 @@ public class EdgeIntegrationTests
             tagNamespace);
 
     private static (EdgeResponseContributor Response, EdgeInvalidationObserver Observer, RecordingQueue Queue) Create(
-        TestProvider provider)
+        TestProvider provider,
+        TimeProvider? timeProvider = null)
     {
         CacheOrchestratorEdgeOptions edgeOptions = CreateEdgeOptions(provider, enabled: true);
         IOptionsMonitor<CacheOrchestratorEdgeOptions> edgeMonitor = Substitute.For<IOptionsMonitor<CacheOrchestratorEdgeOptions>>();
@@ -334,9 +394,19 @@ public class EdgeIntegrationTests
         var projector = new EdgeTagProjector();
         var queue = new RecordingQueue();
         return (
-            new EdgeResponseContributor(domainOptions, instances, projector, NullLogger<EdgeResponseContributor>.Instance),
+            new EdgeResponseContributor(
+                domainOptions,
+                instances,
+                projector,
+                NullLogger<EdgeResponseContributor>.Instance,
+                timeProvider),
             new EdgeInvalidationObserver(domainOptions, instances, projector, queue),
             queue);
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
     }
 
     private static CacheOrchestratorEdgeOptions CreateEdgeOptions(TestProvider provider, bool enabled) =>
