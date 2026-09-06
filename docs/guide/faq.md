@@ -158,9 +158,9 @@ See [Domain profiles — ETag policy](domain-profiles.md#choose-an-etag-policy-d
 
 ### Does Client Cache Schedule change server TTLs?
 
-No. `ScheduledUpdateUtc`, `ClientCache.TtlSeconds`, and `TtlMinSeconds` affect only browser/CDN `Cache-Control`.
+It does not change Output Cache, Data Cache, or FusionCache engine TTLs. When CacheOrchestrator Edge is enabled for the domain, the schedule also controls Edge fresh TTL metadata: Edge uses its own configured TTL as the maximum and the client minimum as its floor.
 
-Output Cache, Data Cache, and FusionCache engine TTLs remain independent. See [Client Cache Schedule](client-cache-schedule.md).
+See [Client Cache Schedule](client-cache-schedule.md).
 
 ### Can server invalidation purge a browser or CDN?
 

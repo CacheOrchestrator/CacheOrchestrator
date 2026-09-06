@@ -50,5 +50,6 @@
 		<InternalsVisibleTo Include="CacheOrchestrator.Benchmarks" />
 		<InternalsVisibleTo Include="CacheOrchestrator.HttpBus" />
 		<InternalsVisibleTo Include="CacheOrchestrator.Redis" />
+		<InternalsVisibleTo Include="CacheOrchestrator.Edge" />
 	</ItemGroup>
 </Project>

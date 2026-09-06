@@ -1,3 +1,4 @@
+using CacheOrchestrator.Configuration;
 using CacheOrchestrator.Edge.Configuration;
 using CacheOrchestrator.Edge.Diagnostics;
 using CacheOrchestrator.Edge.Providers;
@@ -14,12 +15,14 @@ internal sealed class EdgeResponseContributor : ICacheResponseContributor
     private readonly EdgeInstanceResolver _instances;
     private readonly EdgeTagProjector _projector;
     private readonly ILogger<EdgeResponseContributor> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public EdgeResponseContributor(
         IDomainEdgeOptionsProvider domainOptions,
         EdgeInstanceResolver instances,
         EdgeTagProjector projector,
-        ILogger<EdgeResponseContributor> logger)
+        ILogger<EdgeResponseContributor> logger,
+        TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(domainOptions);
         ArgumentNullException.ThrowIfNull(instances);
@@ -29,6 +32,7 @@ internal sealed class EdgeResponseContributor : ICacheResponseContributor
         _instances = instances;
         _projector = projector;
         _logger = logger;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public ValueTask ContributeAsync(CacheResponseContext context, CancellationToken cancellationToken = default)
@@ -53,12 +57,28 @@ internal sealed class EdgeResponseContributor : ICacheResponseContributor
         instance.ResponseProvider.ApplyResponseMetadata(context.HttpContext.Response, new EdgeResponseMetadata
         {
             IsCacheable = cacheable,
-            Ttl = options.Ttl,
+            Ttl = ResolveTtl(options, context.DomainOptions),
             StaleWhileRevalidate = options.StaleWhileRevalidate,
             StaleIfError = options.StaleIfError,
             Tags = tags
         });
         return ValueTask.CompletedTask;
+    }
+
+    private TimeSpan ResolveTtl(DomainEdgeOptions edge, DomainHttpCacheOptions domain)
+    {
+        int maxSeconds = edge.Ttl.TotalSeconds >= int.MaxValue
+            ? int.MaxValue
+            : Math.Max(0, (int)edge.Ttl.TotalSeconds);
+        DateTimeOffset? scheduledUpdateUtc = domain.ClientTtlSeconds > 0
+            ? domain.ScheduledUpdateUtc
+            : null;
+        ClientCacheScheduleResult schedule = ClientCacheScheduleEvaluator.Evaluate(
+            maxSeconds,
+            domain.ClientTtlMinSeconds,
+            scheduledUpdateUtc,
+            _timeProvider.GetUtcNow());
+        return TimeSpan.FromSeconds(schedule.MaxAgeSeconds);
     }
 
     private bool TryProjectWithinBudget(

@@ -223,7 +223,7 @@ public class ClientCacheScheduleHttpTests
     /// toward <c>ScheduledUpdateUtc</c> (Approaching), then sits at the min TTL in Hold.
     /// After the cutover, config sets <c>ScheduledUpdateUtc</c> to the <strong>next</strong> planned
     /// update (far in the future) so the domain returns to <strong>Calm</strong> with full client TTL.
-    /// Schedule affects only client <c>Cache-Control</c> / <c>X-CacheOrchestrator phase=</c> — not server OC/FC TTLs.
+    /// Schedule affects client <c>Cache-Control</c> and an enabled Edge fresh TTL — not server OC/FC TTLs.
     /// </para>
     /// <para>
     /// Script (fake clock + config reload; no real multi-hour wait):

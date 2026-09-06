@@ -13,7 +13,7 @@ If you have not used CacheOrchestrator before, begin with [Getting started](gett
 3. [Domain profiles](domain-profiles.md) — decide whether data changes as a snapshot or one entity at a time.
 4. [Packages](packages.md) — select host, Data Cache engine, Redis, and optional integrations.
 5. [Topologies](topologies.md) — place stores in memory or Redis and decide how instances coordinate.
-6. [Client Cache Schedule](client-cache-schedule.md) — prepare browsers and CDNs for a planned snapshot cutover.
+6. [Client Cache Schedule](client-cache-schedule.md) — prepare browsers and enabled Edge caches for a planned snapshot cutover.
 7. [Edge cache integration](edge.md) — extend domain/entity freshness and invalidation to Cloudflare or Varnish.
 8. [Operations](operations.md) — read `X-CacheOrchestrator`, use telemetry, and apply safe runtime changes.
 
@@ -28,7 +28,7 @@ The path deliberately chooses the domain policy before infrastructure. The endpo
 | Design a snapshot or CRUD domain | [Domain profiles](domain-profiles.md) |
 | Decide which NuGet packages to install | [Packages](packages.md) |
 | Compare InMemory, Redis, backplane, and HttpBus | [Topologies](topologies.md) |
-| Shorten client TTLs before a known release | [Client Cache Schedule](client-cache-schedule.md) |
+| Shorten client and enabled Edge TTLs before a known release | [Client Cache Schedule](client-cache-schedule.md) |
 | Coordinate Cloudflare or Varnish edge invalidation | [Edge cache integration](edge.md) |
 | Diagnose or change a running deployment | [Operations](operations.md) |
 | Evaluate direct platform APIs against the domain model | [Comparison](comparison.md) · [endpoint worked example](comparison-endpoint-example.md) |

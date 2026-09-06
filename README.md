@@ -199,7 +199,7 @@ This keeps Output Cache in memory and moves the Fusion Data Cache L2 and backpla
 A domain is a named set of cache rules: lifetimes, which layers to use, and how they are backed. For example, in a fleet tracking application, different types of data require different cache configurations:
 
 - **Static mapping assets** may change once a year. Long Output Cache and Client Cache lifetimes are enough; Data Cache is optional.
-- **Map tiles and batched datasets** change on a published schedule. Client lifetimes can stay long during the calm period and automatically shorten as the cutover approaches. The [Client Cache Schedule](docs/guide/client-cache-schedule.md) coordinates that countdown without changing Output Cache or Data Cache TTLs.
+- **Map tiles and batched datasets** change on a published schedule. Client and enabled Edge lifetimes can stay long during the calm period and automatically shorten as the cutover approaches. The [Client Cache Schedule](docs/guide/client-cache-schedule.md) coordinates that countdown without changing Output Cache or Data Cache TTLs.
 - **Fleet telemetry** ages in minutes. A short lifetime, in-memory Output Cache, and a shared Redis Data Cache with a backplane keep several instances consistent.
 - **Live vehicle positions** age in seconds. FusionCache locking and fail-safe stop a stampede when many callers miss at once; Output Cache stays off or very short.
 

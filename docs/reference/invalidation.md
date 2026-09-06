@@ -228,6 +228,8 @@ For origin caches, without a distributed store, a backplane, or HttpBus, invalid
 
 When `CacheOrchestrator.Edge` is enabled for a domain, the initiating process also queues an external tag purge after local invalidation. HttpBus peers apply their local invalidation but do not enqueue duplicate edge requests. The built-in bounded queue coalesces and retries in memory; it is best-effort and can lose pending work on a crash. It drains during graceful host shutdown. See [Edge cache integration](../guide/edge.md).
 
+An Edge-enabled domain is also purged when its `Version` changes. Changing `ClientCache:ScheduledUpdateUtc` does not purge Edge; subsequent origin responses calculate fresh TTL from the new schedule, while existing Edge objects retain their stored TTL until they expire or are invalidated independently. Other Edge and Client Cache setting changes are not policy-change purge triggers.
+
 `CacheInvalidationResult.Succeeded` describes local Data Cache/Output Cache eviction, not successful Edge queueing or completed provider purge. Observe Edge metrics and logs separately.
 
 Cluster **configuration** management (shared `appsettings.cache.json`, ConfigMap, env) does **not** by itself purge L1/L2 on other nodes. It only keeps **policy** in sync (Version, TTLs). See [deployment.md — Shared configuration](deployment.md#shared-configuration-across-instances).

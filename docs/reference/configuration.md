@@ -136,7 +136,7 @@ services.AddCacheOrchestratorEdge(configuration, edge =>
 | `Enabled` | `false` | Emit provider metadata and coordinate purge for this domain |
 | `PurgeOnStartup` | `false` | Enqueue a domain-tag purge on host startup when Edge is enabled |
 | `Instance` | empty | Named `EdgeInstances` entry; required when enabled |
-| `TtlSeconds` | `300` | Edge-only fresh lifetime |
+| `TtlSeconds` | `300` | Edge fresh lifetime and Edge maximum during an active Client Cache Schedule |
 | `StaleWhileRevalidateSeconds` | null | Optional edge stale/revalidation window |
 | `StaleIfErrorSeconds` | null | Optional edge stale/error window |
 
@@ -258,8 +258,8 @@ Same JSON object as portable `DataCache`; bound by `CacheOrchestrator.AspNetCore
 |----------|----------|-------------|
 | `Cacheability` | `Public` | `Public`, `Private`, `NoStore` |
 | `TtlSeconds` | `3600` | Target max-age far from schedule; `0` emits `max-age=0` and disables the schedule ramp |
-| `TtlMinSeconds` | `60` | Floor max-age near/at update and during hold; `0` is valid and the value is ignored when `TtlSeconds` is `0` |
-| `ScheduledUpdateUtc` | null | Planned cutover; linear ramp of max-age toward min |
+| `TtlMinSeconds` | `60` | Floor max-age near/at update and during hold; also the enabled Edge fresh-TTL floor, clamped to the Edge maximum; `0` is valid and the value is ignored when `TtlSeconds` is `0` |
+| `ScheduledUpdateUtc` | null | Planned cutover; linear ramp of client and enabled Edge fresh TTLs toward min; changes apply to subsequent responses without an Edge purge |
 | `MustRevalidateNearUpdate` | false | Append `must-revalidate` at min floor |
 | `ForcePrivateWhenAuthenticated` | true | Force client Private for signed-in Identity + Public |
 

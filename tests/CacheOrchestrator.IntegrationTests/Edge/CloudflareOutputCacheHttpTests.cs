@@ -17,11 +17,82 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Text.Json;
 
 namespace CacheOrchestrator.IntegrationTests.Edge;
 
 public class CloudflareOutputCacheHttpTests
 {
+    [Fact]
+    public async Task ClientSchedule_ControlsEdgeTtlAndRuntimeRescheduleRestoresConfiguredTtl()
+    {
+        DateTimeOffset now = new(2030, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var time = new MutableTimeProvider(now);
+        WebApplicationBuilder builder = WebApplication.CreateBuilder();
+        builder.Logging.ClearProviders();
+        builder.WebHost.UseTestServer();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Cache:Namespace"] = "edge-schedule",
+            ["Cache:OutputCache:Provider"] = "InMemory",
+            ["Cache:DataCacheInstances:default:Provider"] = "InMemory",
+            ["Cache:EdgeInstances:edge:Provider"] = "Cloudflare",
+            ["Cache:EdgeInstances:edge:Cloudflare:ZoneId"] = "zone-1",
+            ["Cache:EdgeInstances:edge:Cloudflare:ApiToken"] = "token-1",
+            ["Cache:Domains:catalog:OutputCache:Enabled"] = "true",
+            ["Cache:Domains:catalog:OutputCache:TtlSeconds"] = "3600",
+            ["Cache:Domains:catalog:ClientCache:Cacheability"] = "Public",
+            ["Cache:Domains:catalog:ClientCache:TtlSeconds"] = "3600",
+            ["Cache:Domains:catalog:ClientCache:TtlMinSeconds"] = "60",
+            ["Cache:Domains:catalog:ClientCache:ScheduledUpdateUtc"] = now.AddSeconds(700).ToString("O"),
+            ["Cache:Domains:catalog:Edge:Enabled"] = "true",
+            ["Cache:Domains:catalog:Edge:Instance"] = "edge",
+            ["Cache:Domains:catalog:Edge:TtlSeconds"] = "600"
+        });
+        var queue = new RecordingEdgeInvalidationQueue();
+        builder.Services.AddSingleton<TimeProvider>(time);
+        builder.Services.AddSingleton<IEdgeInvalidationQueue>(queue);
+        builder.Services.AddCacheOrchestrator(builder.Configuration);
+        builder.Services.AddCacheOrchestratorEdge(
+            builder.Configuration,
+            edge => edge.AddCloudflare());
+
+        await using WebApplication app = builder.Build();
+        app.UseCacheOrchestrator();
+        app.MapGet("/catalog", () => Results.Text("catalog"))
+            .CacheOutputWithDomain("catalog");
+        await app.StartAsync(TestContext.Current.CancellationToken);
+        HttpClient client = app.GetTestClient();
+
+        using HttpResponseMessage calm = await client.GetAsync("/catalog", TestContext.Current.CancellationToken);
+        GetCloudflareMaxAge(calm).Should().Be(600);
+
+        time.Advance(TimeSpan.FromSeconds(400));
+        using HttpResponseMessage approaching = await client.GetAsync("/catalog", TestContext.Current.CancellationToken);
+        GetCloudflareMaxAge(approaching).Should().Be(300);
+        approaching.Headers.GetValues("X-CacheOrchestrator").Single().Should().Contain("oc=hit");
+
+        time.Advance(TimeSpan.FromSeconds(400));
+        using HttpResponseMessage hold = await client.GetAsync("/catalog", TestContext.Current.CancellationToken);
+        GetCloudflareMaxAge(hold).Should().Be(60);
+
+        DateTimeOffset nextUpdate = time.GetUtcNow().AddHours(1);
+        await app.Services.GetRequiredService<ICacheOrchestratorManagement>().PatchSettingsAsync(
+            "catalog",
+            new AdminSettingsPatchRequest
+            {
+                Settings = new Dictionary<string, JsonElement>
+                {
+                    ["clientCache.scheduledUpdateUtc"] = JsonSerializer.SerializeToElement(nextUpdate.ToString("O"))
+                }
+            },
+            TestContext.Current.CancellationToken);
+
+        using HttpResponseMessage rescheduled = await client.GetAsync("/catalog", TestContext.Current.CancellationToken);
+        GetCloudflareMaxAge(rescheduled).Should().Be(600);
+        queue.Jobs.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task RuntimeVersionChange_QueuesPurgeOnlyForEdgeEnabledDomain()
     {
@@ -107,6 +178,54 @@ public class CloudflareOutputCacheHttpTests
         queue.Jobs.Should().HaveCount(2);
         queue.Jobs.Should().OnlyContain(job => job.Tags.Single() ==
             new EdgeTagProjector().Project("edge-reload-edge-edge", CacheTags.Domain("catalog")));
+    }
+
+    [Fact]
+    public async Task ConfigurationReload_ScheduledUpdateChange_RecalculatesEdgeTtlWithoutPurge()
+    {
+        DateTimeOffset now = new(2030, 1, 15, 0, 0, 0, TimeSpan.Zero);
+        var reload = new ReloadableMemoryConfigurationSource(new Dictionary<string, string?>
+        {
+            ["Cache:Namespace"] = "edge-schedule-reload",
+            ["Cache:OutputCache:Provider"] = "InMemory",
+            ["Cache:DataCacheInstances:default:Provider"] = "InMemory",
+            ["Cache:EdgeInstances:edge:Provider"] = "Cloudflare",
+            ["Cache:EdgeInstances:edge:Cloudflare:ZoneId"] = "zone-1",
+            ["Cache:EdgeInstances:edge:Cloudflare:ApiToken"] = "token-1",
+            ["Cache:Domains:catalog:ClientCache:TtlSeconds"] = "3600",
+            ["Cache:Domains:catalog:ClientCache:TtlMinSeconds"] = "60",
+            ["Cache:Domains:catalog:ClientCache:ScheduledUpdateUtc"] = "2030-01-01T00:00:00Z",
+            ["Cache:Domains:catalog:Edge:Enabled"] = "true",
+            ["Cache:Domains:catalog:Edge:Instance"] = "edge",
+            ["Cache:Domains:catalog:Edge:TtlSeconds"] = "600"
+        });
+        IConfigurationRoot configuration = new ConfigurationBuilder().Add(reload).Build();
+        WebApplicationBuilder builder = WebApplication.CreateBuilder();
+        builder.Logging.ClearProviders();
+        builder.WebHost.UseTestServer();
+        var queue = new RecordingEdgeInvalidationQueue();
+        builder.Services.AddSingleton<TimeProvider>(new MutableTimeProvider(now));
+        builder.Services.AddSingleton<IEdgeInvalidationQueue>(queue);
+        builder.Services.AddCacheOrchestrator(configuration);
+        builder.Services.AddCacheOrchestratorEdge(configuration, edge => edge.AddCloudflare());
+
+        await using WebApplication app = builder.Build();
+        app.UseCacheOrchestrator();
+        app.MapGet("/catalog", () => Results.Text("catalog"))
+            .CacheOutputWithDomain("catalog");
+        await app.StartAsync(TestContext.Current.CancellationToken);
+        HttpClient client = app.GetTestClient();
+
+        using HttpResponseMessage hold = await client.GetAsync("/catalog", TestContext.Current.CancellationToken);
+        GetCloudflareMaxAge(hold).Should().Be(60);
+
+        reload.Provider!.SetAndReload(
+            "Cache:Domains:catalog:ClientCache:ScheduledUpdateUtc",
+            "2030-02-01T00:00:00Z");
+
+        using HttpResponseMessage rescheduled = await client.GetAsync("/catalog", TestContext.Current.CancellationToken);
+        GetCloudflareMaxAge(rescheduled).Should().Be(600);
+        queue.Jobs.Should().BeEmpty();
     }
 
     [Fact]
@@ -239,5 +358,13 @@ public class CloudflareOutputCacheHttpTests
             await Task.Delay(25, TestContext.Current.CancellationToken);
 
         queue.Jobs.Count.Should().BeGreaterThanOrEqualTo(expected);
+    }
+
+    private static int GetCloudflareMaxAge(HttpResponseMessage response)
+    {
+        string header = response.Headers.GetValues("Cloudflare-CDN-Cache-Control").Single();
+        string directive = header.Split(',', StringSplitOptions.TrimEntries)
+            .Single(value => value.StartsWith("max-age=", StringComparison.Ordinal));
+        return int.Parse(directive["max-age=".Length..], System.Globalization.CultureInfo.InvariantCulture);
     }
 }

@@ -23,41 +23,24 @@ public static class ClientCacheHeaderGenerator
         if (cacheability == ClientCacheability.NoStore)
             return new Result("no-store", 0, ClientCacheSchedulePhase.NotApplicable);
 
-        int max = Math.Max(0, config.ClientTtlSeconds);
-        if (max == 0)
-            return Finish(cacheability, 0, ClientCacheSchedulePhase.NotApplicable, mustRevalidate: false);
-
-        int min = Math.Clamp(config.ClientTtlMinSeconds, 0, max);
-        bool mustRevalidateNear = config.ClientMustRevalidateNearUpdate;
-
-        if (config.ScheduledUpdateUtc is null)
-            return Finish(cacheability, max, ClientCacheSchedulePhase.NotApplicable, mustRevalidate: false);
-
-        DateTimeOffset schedule = config.ScheduledUpdateUtc.Value;
-        if (now >= schedule)
-            return Finish(cacheability, min, ClientCacheSchedulePhase.Hold, mustRevalidateNear);
-
-        double secondsToSchedule = (schedule - now).TotalSeconds;
-        if (secondsToSchedule >= max)
-            return Finish(cacheability, max, ClientCacheSchedulePhase.Calm, mustRevalidate: false);
-
-        int maxAge;
-        if (max == min)
-        {
-            maxAge = min;
-        }
-        else
-        {
-            double time = Math.Clamp(secondsToSchedule, min, max);
-            maxAge = (int)Math.Round(min + ((max - min) * (time - min) / (max - min)));
-            maxAge = Math.Clamp(maxAge, min, max);
-        }
+        ClientCacheScheduleResult schedule = ClientCacheScheduleEvaluator.Evaluate(
+            config.ClientTtlSeconds,
+            config.ClientTtlMinSeconds,
+            config.ScheduledUpdateUtc,
+            now);
+        bool mustRevalidate = config.ClientMustRevalidateNearUpdate
+            && schedule.Phase is ClientCacheSchedulePhase.Hold
+                or ClientCacheSchedulePhase.Approaching
+            && schedule.MaxAgeSeconds <= Math.Clamp(
+                config.ClientTtlMinSeconds,
+                0,
+                Math.Max(0, config.ClientTtlSeconds));
 
         return Finish(
             cacheability,
-            maxAge,
-            ClientCacheSchedulePhase.Approaching,
-            mustRevalidateNear && maxAge <= min);
+            schedule.MaxAgeSeconds,
+            schedule.Phase,
+            mustRevalidate);
     }
 
     private static Result Finish(

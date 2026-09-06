@@ -575,6 +575,62 @@ public class ClusterBusMultiHostTests
     }
 
     [Fact]
+    public async Task AdminDistributeTrue_ScheduledUpdatePatch_DoesNotQueueEdgePurge()
+    {
+        int portA = GetFreePort();
+        int portB = GetFreePort();
+        string urlA = $"http://127.0.0.1:{portA}";
+        string urlB = $"http://127.0.0.1:{portB}";
+        string ns = "it-edge-schedule-" + Guid.NewGuid().ToString("N")[..8];
+        string domain = "reports";
+        (string Id, string Url)[] peers = [("node-a", urlA), ("node-b", urlB)];
+        Dictionary<string, string?> edgeConfig = new()
+        {
+            ["Cache:EdgeInstances:edge:Provider"] = "Test",
+            [$"Cache:Domains:{domain}:Edge:Enabled"] = "true",
+            [$"Cache:Domains:{domain}:Edge:Instance"] = "edge"
+        };
+        var queueA = new RecordingEdgeQueue();
+        var queueB = new RecordingEdgeQueue();
+
+        await using ClusterHost a = await StartHostOnPortAsync(
+            "node-a", ns, domain, "/api/r", portA, peers, "k", true,
+            extraConfig: edgeConfig,
+            configureServices: (services, configuration) => AddTestEdge(services, configuration, queueA));
+        await using ClusterHost b = await StartHostOnPortAsync(
+            "node-b", ns, domain, "/api/r", portB, peers, "k", true,
+            extraConfig: edgeConfig,
+            configureServices: (services, configuration) => AddTestEdge(services, configuration, queueB));
+
+        const string scheduledUpdateUtc = "2030-12-01T00:00:00Z";
+        using StringContent body = new(
+            $$"""{"settings":{"clientCache.scheduledUpdateUtc":"{{scheduledUpdateUtc}}"},"distribute":true}""",
+            Encoding.UTF8,
+            "application/json");
+        using HttpRequestMessage request = new(HttpMethod.Patch, $"/cache-admin/local/domains/{domain}/settings")
+        {
+            Content = body
+        };
+        (await a.Client.SendAsync(request, Ct)).EnsureSuccessStatusCode();
+
+        DateTimeOffset timeout = DateTimeOffset.UtcNow.AddSeconds(5);
+        AdminDomainConfigDto? peerDomain = null;
+        while (DateTimeOffset.UtcNow < timeout)
+        {
+            peerDomain = await b.Client.GetFromJsonAsync<AdminDomainConfigDto>(
+                $"/cache-admin/local/domains/{domain}",
+                Ct);
+            if (peerDomain?.ScheduledUpdateUtc == DateTimeOffset.Parse(scheduledUpdateUtc))
+                break;
+            await Task.Delay(25, Ct);
+        }
+
+        peerDomain!.ScheduledUpdateUtc.Should().Be(DateTimeOffset.Parse(scheduledUpdateUtc));
+        queueA.Jobs.Should().BeEmpty();
+        queueB.Jobs.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task ClusterInfo_ReportsMembershipAndPeers()
     {
         string ns = "it-info-" + Guid.NewGuid().ToString("N")[..8];

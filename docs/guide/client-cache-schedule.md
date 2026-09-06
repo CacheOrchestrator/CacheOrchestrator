@@ -6,7 +6,7 @@ Long-lived public datasets create a client-caching dilemma. A 30-day browser or 
 
 **Client Cache Schedule** lets a snapshot domain keep a long client `max-age` while the cutover is far away, then gradually shorten it as the scheduled time approaches.
 
-It changes only the client-facing `Cache-Control` header. It does not change Output Cache TTL, Data Cache TTL, server entries, or the domain `Version`.
+It changes the client-facing `Cache-Control` header and, when the domain has Edge enabled, the Edge fresh TTL emitted by CacheOrchestrator. It does not change Output Cache TTL, Data Cache TTL, stored settings, or the domain `Version`.
 
 ## Table of Contents
 
@@ -32,6 +32,10 @@ Each response is assigned one phase:
 | **Approaching** | Inside that window but before cutover | Shorten `max-age` linearly toward `TtlMinSeconds` |
 | **Hold** | Scheduled time has arrived or passed | Stay at `TtlMinSeconds` until the schedule changes |
 | **NotApplicable** | No schedule, Client Cache blocked, or `NoStore` | Use the normal constant header or `no-store` |
+
+An Edge-enabled domain follows the same calculation with `Edge:TtlSeconds` as its maximum and `ClientCache:TtlMinSeconds` as its floor. Consequently, client and Edge Approaching phases may begin at different times. For example, a 30-day client TTL and a 7-day Edge TTL begin approaching 30 days and 7 days before the same cutover. The minimum is clamped to each layer's maximum.
+
+Edge stale windows remain the configured `StaleWhileRevalidateSeconds` and `StaleIfErrorSeconds`; this schedule controls the Edge fresh TTL only.
 
 During most of the Approaching phase, `max-age` roughly follows the time remaining. Once the cutover is closer than the configured floor, clients still receive the floor value. The floor deliberately trades an exact cutover boundary for a minimum practical cache lifetime.
 
@@ -71,7 +75,7 @@ The settings mean:
 - clients may cache for 30 days during Calm;
 - the ramp begins 30 days before the scheduled time;
 - the client TTL never falls below 15 minutes;
-- `must-revalidate` is added at the floor and during Hold;
+- `must-revalidate` is added to the client header at the floor and during Hold;
 - Output Cache continues using a 5-minute TTL, while Data Cache continues using a 1-hour TTL.
 
 | Setting | Purpose |
@@ -84,7 +88,7 @@ The settings mean:
 
 Configuration durations are integer seconds. If the minimum exceeds the maximum, it is clamped to the maximum. Equal values produce no visible ramp.
 
-Set `TtlSeconds` to `0` when clients must revalidate every response: CacheOrchestrator emits `max-age=0` and the schedule is not applicable. A positive `TtlSeconds` may use `TtlMinSeconds: 0` to ramp all the way down to immediate revalidation at cutover.
+Set `TtlSeconds` to `0` when clients must revalidate every response: CacheOrchestrator emits `max-age=0` and the schedule is not applicable to either client or Edge. A positive `TtlSeconds` may use `TtlMinSeconds: 0` to ramp both client and enabled Edge fresh TTLs all the way down to zero at cutover.
 
 ## Understand what the schedule does not do
 
@@ -94,10 +98,12 @@ Client Cache Schedule does not:
 - prewarm Output Cache or Data Cache entries;
 - change the domain `Version`;
 - invalidate server entries;
-- purge a browser or CDN cache;
+- purge a browser cache;
 - coordinate deployment across application instances.
 
-It prepares clients to ask again more frequently near a known date. Your release process still owns the data cutover and generation change.
+It prepares clients and an enabled Edge cache to ask the next layer more frequently near a known date. Your release process still owns the data cutover and generation change. Natural phase transitions do not enqueue purges; the TTL calculated when an Edge object is stored makes that object expire on the intended schedule.
+
+Changing `ScheduledUpdateUtc` updates the calculation used by subsequent origin responses. It does not purge an existing Edge object, so that object retains the TTL with which it was stored until it expires or is invalidated independently. After the next Edge miss, the response uses the new schedule and returns to the configured `Edge:TtlSeconds` when the new date is outside the Edge approach window. The same rule applies to configuration reload and Management/Admin changes distributed over HttpBus.
 
 This distinction matters because a scheduled header and a version bump solve opposite sides of the boundary:
 
@@ -123,14 +129,14 @@ Changing the schedule too late cannot affect clients that are already holding a 
 1. Make the new snapshot available to every application instance.
 2. Change the domain `Version` so new requests use the new generation.
 3. For an Edge-enabled domain, the Version change automatically queues a domain-tag purge. Inspect its delivery outcome before declaring the release complete.
-4. Set the next `ScheduledUpdateUtc`, or clear it if the next date is unknown.
+4. Set the next `ScheduledUpdateUtc`, or clear it if the next date is unknown. The next origin response returns to its configured Edge TTL when the new date is outside the Edge approach window; existing Edge objects are not purged.
 5. Verify responses, cache diagnostics, Edge purge outcomes, and origin load.
 
 Keep the old schedule temporarily if you want the domain to remain in Hold during deployment verification. Set the next future schedule when it is safe to resume the long client TTL.
 
 ### After the release
 
-The next future schedule returns responses to Calm. A cleared schedule returns the normal constant `TtlSeconds` with phase `n/a`.
+The next future schedule returns responses to Calm. Client responses return to `ClientCache:TtlSeconds`; Edge responses return to `Edge:TtlSeconds`. A cleared schedule returns the normal constant values with client phase `n/a`.
 
 Old server entries remain in the old versioned key space until their store TTL removes them. Old client responses age according to the headers they received before the cutover.
 
@@ -158,7 +164,7 @@ X-CacheOrchestrator: domain=maps-satellite; ...; phase=approaching; ...
 
 The `cache_orchestrator.client.schedule` metric carries `domain` and `phase` tags. Use it to confirm the transition and anticipate the increase in requests as client TTLs shorten.
 
-The phase reports which branch generated the current header. It does not prove that every client received that header or that a CDN obeyed it.
+The phase reports which branch generated the current client header. Edge uses its own maximum TTL, so its effective phase can differ and is not currently included in `X-CacheOrchestrator`. The header does not prove that every client received the policy or that a CDN obeyed it.
 
 See [Observability](../reference/observability.md) for the full header and metric reference.
 
