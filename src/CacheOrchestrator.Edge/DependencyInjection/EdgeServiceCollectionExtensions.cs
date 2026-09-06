@@ -56,6 +56,8 @@ public static class EdgeServiceCollectionExtensions
         services.TryAddSingleton<EdgeDomainChangeMonitor>();
         services.AddSingleton<IDomainVersionChangeObserver>(services =>
             services.GetRequiredService<EdgeDomainChangeMonitor>());
+        services.AddSingleton<IDomainSettingsInvalidationObserver>(services =>
+            services.GetRequiredService<EdgeDomainChangeMonitor>());
         services.AddHostedService<EdgeDomainChangeMonitor>(services =>
             services.GetRequiredService<EdgeDomainChangeMonitor>());
         return services;

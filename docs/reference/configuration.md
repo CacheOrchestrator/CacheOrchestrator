@@ -188,6 +188,45 @@ For one domain, the Core and ASP.NET Core options providers resolve values in th
 
 `CacheOrchestrator.Core` produces an immutable `DomainCacheOptions` snapshot for domain identity and Data Cache policy. `CacheOrchestrator.AspNetCore` composes it into `DomainHttpCacheOptions` for Output Cache, Client Cache, authentication, vary, ETag, and HTTP Data Cache key policy. A request reuses its HTTP snapshot; configuration reloads and later overlays affect newly resolved requests, not values already attached to the current request. Provider and connection sections such as `OutputCache`, `DataCacheInstances`, and `Redis` are host composition settings and do not participate in this per-domain merge.
 
+### Domain-setting change activation and invalidation
+
+A setting change is a policy change, not a declaration that cached content changed. Unless the table below says otherwise, existing entries retain the policy with which they were created and expire naturally; newly stored entries use the new policy. This makes a configured TTL an actual upper bound on how long an entry may keep its creation policy.
+
+There are three exceptions:
+
+1. `Version` is the explicit content-generation boundary. A changed Version selects new OC/DC generations and automatically purges an enabled Edge domain.
+2. OC/DC key-shaping changes immediately select a deterministic policy generation in the cache key. Old entries are no longer read under the new policy and expire naturally; no store scan or physical purge is required.
+3. Edge changes that could leave an unsafe shared representation automatically purge the domain. Configuration reload also purges the old and new placement when Edge is disabled, enabled, or moved to another instance/provider namespace.
+
+The Admin settings PATCH accepts `applyImmediately: true` for the optional actions below. If several changed settings target the same cache layer, that domain layer is invalidated once. With HttpBus distribution, every instance invalidates its local OC/DC state, but only the command origin queues the external Edge purge. Configuration-file reload has no `applyImmediately` switch: optional rows keep natural-expiration behavior.
+
+| Domain setting(s) | Default behavior after change | With Admin `applyImmediately: true` |
+|-------------------|-------------------------------|------------------------------------|
+| `Version` | New OC/DC generation; enabled Edge domain purged | Same; the flag is not needed |
+| `AuthBypassMode`, `VaryOutputCacheByUser`, `TreatAuthorizationAsAuthSignal`, `AuthVaryIncludeAuthorizationHash`, `VaryByAuthClaims` | New OC/DC key-policy generation; stricter bypass also takes effect on new requests | Same; Edge is additionally purged where the change is an Edge safety rule |
+| `VaryByAccept`, `AcceptNormalizationList`, `VaryByAcceptLanguage`, `AcceptLanguageNormalizationList`, `VaryByHeaders`, `VaryByQueryKeys`, `IgnoreQueryKeys`, `VaryByCookies` | New OC/DC key-policy generation. Edge is automatically purged for changed native header-vary dimensions (`VaryByAccept`, `VaryByAcceptLanguage`, `VaryByHeaders`) | Same |
+| `EmitResponseVary` | `false → true` automatically purges enabled Edge; other changes affect new responses | Same |
+| `DataCache.RespectAuthBypass`, `DataCache.VaryOnPublicAddress`, `DataCache.VaryOnEncoding` | Relevant DC bypass/key-policy changes apply immediately; old key generation expires naturally | Same |
+| `OutputCache.VaryByHost`, `OutputCache.EncodingNormalizationList` | New OC key-policy generation; old generation expires naturally | Same |
+| `DataCache.Enabled`, `OutputCache.Enabled` | Disabling bypasses the layer immediately, but retained entries expire naturally | Disabling also evicts that domain from the affected layer; enabling does not evict |
+| `DataCache.Instance` | New requests use the new instance; entries in the old instance expire naturally | Same |
+| `DataCache.TtlSeconds`, `OutputCache.TtlSeconds` | Existing entries retain their creation TTL | A decrease evicts the affected domain layer once; an increase does not |
+| `FusionCache.HardTtlSeconds`, `FailSafeSeconds`, `JitterSeconds`, `MaxItemBytes` | Existing entries retain their creation policy | A decrease evicts the domain from Data Cache once; an increase does not |
+| Other `FusionCache` settings | Affect subsequent cache operations/factories; existing entries expire naturally | No additional invalidation |
+| `OutputCache.ETagMode` | Existing OC/Edge responses retain their original ETag until expiration | Evicts OC and purges enabled Edge |
+| `OutputCache.CacheableStatusCodes` | Affects new storage decisions; existing responses expire naturally | Not runtime-patchable; no additional reload invalidation |
+| `ClientCache.Cacheability` | `Public → Private/NoStore` automatically purges enabled Edge; other changes affect new responses | Same |
+| `ClientCache.ForcePrivateWhenAuthenticated` | `false → true` automatically purges enabled Edge; other changes affect new responses | Same |
+| `ClientCache.TtlMinSeconds` | Existing Edge objects retain their assigned TTL | A decrease purges enabled Edge; an increase does not |
+| `ClientCache.TtlSeconds` | New responses use the new CCS calculation; existing Edge objects retain their assigned TTL | `0 → positive` purges enabled Edge because it enables CCS and may shorten Edge freshness; other changes do not |
+| `ClientCache.ScheduledUpdateUtc` | Recalculates CCS for new responses; does **not** purge by default | Moving the schedule earlier (or setting the first schedule) purges enabled Edge; moving it later does not |
+| `ClientCache.MustRevalidateNearUpdate` | Affects new client responses; existing responses expire naturally | No additional invalidation |
+| `Edge.Enabled` | Reload purges the old placement when disabled and the new placement when enabled | Not runtime-patchable |
+| `Edge.Instance` / effective provider namespace | Reload purges both old and new placements | Not runtime-patchable |
+| `Edge.TtlSeconds`, `StaleWhileRevalidateSeconds`, `StaleIfErrorSeconds`, `PurgeOnStartup` | Affect newly stored Edge responses or the next startup; existing objects expire naturally | Not runtime-patchable |
+
+If an operator needs stronger semantics than the automatic or optional rules provide, use the explicit domain/tag/entity [invalidation API](invalidation.md). A manual domain invalidation remains the unambiguous way to declare that all cached content for a domain is obsolete now.
+
 ### Nested sections
 
 | JSON section | Portable? | Meaning |

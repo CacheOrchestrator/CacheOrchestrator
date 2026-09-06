@@ -65,6 +65,8 @@ public static class CacheOrchestratorCoreServiceCollectionExtensions
 
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IDomainRuntimeOverrideStore, DomainRuntimeOverrideStore>();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IDomainSettingValueProvider, CoreDomainSettingValueProvider>());
         services.TryAddSingleton<IAdminStatsCollector>(_ => NoOpAdminStatsCollector.Instance);
         services.TryAddSingleton<IInstanceIdProvider, DefaultInstanceIdProvider>();
         services.TryAddSingleton<ClusterCommandFactory>();
@@ -79,6 +81,7 @@ public static class CacheOrchestratorCoreServiceCollectionExtensions
         services.TryAddSingleton<ICacheOrchestrator, CacheOrchestratorService>();
         services.TryAddSingleton<IHttpCacheInvalidationSink>(_ => NullHttpCacheInvalidationSink.Instance);
         services.TryAddSingleton<ICacheOrchestratorInvalidator, CacheOrchestratorInvalidator>();
+        services.TryAddSingleton<DomainSettingsInvalidationCoordinator>();
         services.TryAddSingleton<ICacheOrchestratorManagement, CacheOrchestratorManagement>();
     }
 }

@@ -51,6 +51,31 @@ public class ClusterCommandEnvelopeV1Tests
     }
 
     [Fact]
+    public void SettingsPatch_RoundTripsApplyImmediately()
+    {
+        SettingsPatchCommand command = new()
+        {
+            CommandId = Guid.NewGuid(),
+            OriginInstanceId = "node-a",
+            Namespace = "store",
+            TimestampUtc = DateTimeOffset.UtcNow,
+            Domain = "products",
+            Settings = new Dictionary<string, JsonElement>
+            {
+                ["outputCache.ttlSeconds"] = JsonSerializer.SerializeToElement(30)
+            },
+            ApplyImmediately = true
+        };
+
+        ClusterCommandEnvelopeV1 envelope = ClusterCommandEnvelopeV1.FromCommand(command);
+        SettingsPatchCommand roundTrip = envelope.ToCommand()
+            .Should().BeOfType<SettingsPatchCommand>().Subject;
+
+        envelope.ApplyImmediately.Should().BeTrue();
+        roundTrip.ApplyImmediately.Should().BeTrue();
+    }
+
+    [Fact]
     public void UnsupportedProtocolVersion_IsRejected()
     {
         ClusterCommandEnvelopeV1 envelope = new()

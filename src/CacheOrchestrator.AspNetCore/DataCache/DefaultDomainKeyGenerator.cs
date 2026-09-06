@@ -79,6 +79,14 @@ public sealed class DefaultDomainKeyGenerator : IDomainKeyGenerator
         try
         {
             CacheVaryMaterial vary = _materializer.Build(http, opts, CacheVarySurface.Fusion);
+            AppendString(
+                hasher,
+                opts.DataCachePolicyGeneration,
+                ref byteBuffer,
+                ref rentedBytes,
+                ref charBuffer,
+                ref rentedChars,
+                lowercase: false);
 
             // 0. Entity identity (CRUD) — both kind and id are required; no id-only key shape.
             // Lookup string is co3:…:e:{hash}; kind/id are hash material only (tags carry them for purge).

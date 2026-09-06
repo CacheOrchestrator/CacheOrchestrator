@@ -19,6 +19,7 @@ internal sealed class DefaultClusterCommandHandler : IClusterCommandHandler
     private readonly ClusterCommandDedupeStore _dedupe;
     private readonly IEnumerable<IDomainSettingsPatchContributor> _settingsContributors;
     private readonly ILogger<DefaultClusterCommandHandler> _logger;
+    private readonly DomainSettingsInvalidationCoordinator? _settingsInvalidation;
 
     public DefaultClusterCommandHandler(
         ICacheOrchestratorInvalidator invalidator,
@@ -27,7 +28,8 @@ internal sealed class DefaultClusterCommandHandler : IClusterCommandHandler
         IOptionsMonitor<CacheOrchestratorOptions> options,
         ClusterCommandDedupeStore dedupe,
         ILogger<DefaultClusterCommandHandler> logger,
-        IEnumerable<IDomainSettingsPatchContributor>? settingsContributors = null)
+        IEnumerable<IDomainSettingsPatchContributor>? settingsContributors = null,
+        DomainSettingsInvalidationCoordinator? settingsInvalidation = null)
     {
         ArgumentNullException.ThrowIfNull(invalidator);
         ArgumentNullException.ThrowIfNull(overrides);
@@ -43,6 +45,7 @@ internal sealed class DefaultClusterCommandHandler : IClusterCommandHandler
         _dedupe = dedupe;
         _settingsContributors = settingsContributors ?? [];
         _logger = logger;
+        _settingsInvalidation = settingsInvalidation;
     }
 
     /// <inheritdoc />
@@ -93,7 +96,7 @@ internal sealed class DefaultClusterCommandHandler : IClusterCommandHandler
                     break;
 
                 case SettingsPatchCommand settings:
-                    ApplySettingsPatch(settings);
+                    await ApplySettingsPatchAsync(settings, cancellationToken).ConfigureAwait(false);
                     break;
 
                 default:
@@ -181,7 +184,7 @@ internal sealed class DefaultClusterCommandHandler : IClusterCommandHandler
         _overrides.SetVersion(command.Domain, command.Version);
     }
 
-    private void ApplySettingsPatch(SettingsPatchCommand command)
+    private async Task ApplySettingsPatchAsync(SettingsPatchCommand command, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.Domain))
         {
@@ -191,11 +194,25 @@ internal sealed class DefaultClusterCommandHandler : IClusterCommandHandler
 
         try
         {
+            string[] settingIds = DomainSettingsInvalidationCoordinator.CanonicalizeSettingIds(command.Settings.Keys);
+            IReadOnlyDictionary<string, System.Text.Json.JsonElement>? before =
+                _settingsInvalidation?.Capture(command.Domain, settingIds);
             DomainSettingsPatchApplicator.Apply(
                 command.Domain,
                 command.Settings,
                 _overrides,
                 _settingsContributors);
+
+            if (_settingsInvalidation is not null && before is not null)
+            {
+                await _settingsInvalidation.ApplyAsync(
+                        command.Domain,
+                        settingIds,
+                        before,
+                        command.ApplyImmediately,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
         }
         catch (ArgumentException ex)
         {

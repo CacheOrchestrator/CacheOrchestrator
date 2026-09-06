@@ -136,7 +136,7 @@ internal sealed class RequestDomainCacheOptionsProvider : IRequestDomainCacheOpt
         TimeSpan clientTtlMin = overlay?.ClientTtlMin
             ?? Seconds(Pick(domainSettings.ClientCache?.TtlMinSeconds, defaults.ClientCache?.TtlMinSeconds, 60));
 
-        return new DomainHttpCacheOptions
+        var resolved = new DomainHttpCacheOptions
         {
             CoreOptions = core,
             OutputCacheEnabled = overlay?.OutputCacheEnabled
@@ -219,6 +219,8 @@ internal sealed class RequestDomainCacheOptionsProvider : IRequestDomainCacheOpt
             OutputCacheVaryByHost = overlay?.OutputCacheVaryByHost
                 ?? Pick(domainSettings.OutputCache?.VaryByHost, defaults.OutputCache?.VaryByHost, true),
         };
+        DomainCachePolicyGeneration.Apply(resolved);
+        return resolved;
     }
 
     private static TimeSpan Seconds(int value) =>

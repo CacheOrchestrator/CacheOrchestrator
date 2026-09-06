@@ -240,11 +240,16 @@ X-CacheOrchestrator-Admin-Key: <key>
     "varyByHeaders": [ "X-Tenant" ],
     "fusionCache.failSafeSeconds": 900
   },
-  "distribute": true
+  "distribute": true,
+  "applyImmediately": true
 }
 ```
 
 Use `GET /domain-settings/catalog` as the canonical list. A setting is writable only when its catalog entry has `runtimeOverlay: true`; IDs are matched case-insensitively, values are validated by their declared kind, and omitted settings keep their current values. Fusion IDs appear only when the FusionCache package has registered its catalog section and patch contributor.
+
+`applyImmediately` defaults to `false`. Most policy changes then affect newly stored entries while existing entries keep the policy with which they were created until natural expiration. Key-shaping changes are an exception: Output Cache and HTTP-derived Data Cache switch to a deterministic new key generation immediately, without scanning or purging the old generation. Edge safety changes are also purged automatically. With `applyImmediately: true`, supported policy reductions additionally invalidate the affected domain layer once; increases do not evict entries. See [configuration — change activation and invalidation](configuration.md#domain-setting-change-activation-and-invalidation) for the complete table.
+
+`distribute: true` carries both the patch and `applyImmediately` to HttpBus peers. Every peer applies its local Output/Data Cache action, while only the originating instance queues the external Edge purge. This avoids one Edge purge per application instance.
 
 A successful Version or settings mutation returns the normalized `domain` and complete effective domain snapshot. With `distribute: true`, a peer failure returns `409` with `localApplied: true`, command metadata, and `peerFailures`; the local mutation is not rolled back.
 
@@ -419,7 +424,7 @@ Quick operator steps: [Admin Console App README](../../src/CacheOrchestrator.Adm
 - Lists: filters, search, sort; detail pages; Hints page (same rules on Prometheus window rows)  
 - **Metrics** (`#/metrics`): window charts from Prometheus; multi-select domains; global Range (relative + absolute from/to)  
 - **Live** (`#/live`): near-real-time health/performance; fixed **1m** Prometheus lookback and **5s** refresh (not Range-scoped). `HintEngine` also runs on this snapshot.  
-- **Operations** (`#/operations`): invalidate / version / **Patch settings**; banner **HTTP fan-out** vs **Cluster bus (distribute)**; cluster probe table; last-run mode in result  
+- **Operations** (`#/operations`): invalidate / version / **Patch settings**, including the optional **Apply immediately** control; banner **HTTP fan-out** vs **Cluster bus (distribute)**; cluster probe table; last-run mode in result
 - **Settings** (`#/settings`): hint rule catalog, enable/disable, reload  
 - Auto-refresh interval in `localStorage`  
 

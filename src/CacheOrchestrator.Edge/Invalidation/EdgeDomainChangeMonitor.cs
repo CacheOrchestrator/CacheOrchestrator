@@ -9,16 +9,20 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
+using System.Text.Json;
 using System.Threading.Channels;
 
 namespace CacheOrchestrator.Edge.Invalidation;
 
 internal sealed record EdgeConfigurationRegistration(IConfiguration Configuration, string ConfigSection);
 
-internal sealed class EdgeDomainChangeMonitor : BackgroundService, IDomainVersionChangeObserver
+internal sealed class EdgeDomainChangeMonitor : BackgroundService,
+    IDomainVersionChangeObserver,
+    IDomainSettingsInvalidationObserver
 {
     private readonly EdgeConfigurationRegistration _registration;
     private readonly IDomainRuntimeOverrideStore? _runtimeOverrides;
+    private readonly IHttpDomainRuntimeOverrideStore? _httpRuntimeOverrides;
     private readonly IDomainEdgeOptionsProvider _domainOptions;
     private readonly EdgeInstanceResolver _instances;
     private readonly EdgeTagProjector _projector;
@@ -48,6 +52,7 @@ internal sealed class EdgeDomainChangeMonitor : BackgroundService, IDomainVersio
         ArgumentNullException.ThrowIfNull(logger);
         _registration = registration;
         _runtimeOverrides = services.GetService<IDomainRuntimeOverrideStore>();
+        _httpRuntimeOverrides = services.GetService<IHttpDomainRuntimeOverrideStore>();
         _domainOptions = domainOptions;
         _instances = instances;
         _projector = projector;
@@ -70,6 +75,28 @@ internal sealed class EdgeDomainChangeMonitor : BackgroundService, IDomainVersio
                 options.Domain,
                 version,
                 VersionIsRuntimeOverride: true,
+                Enabled: true,
+                options.PurgeOnStartup,
+                instance.Name,
+                instance.InvalidationProvider.Name,
+                instance.TagNamespace),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public async ValueTask InvalidateDomainSettingsAsync(
+        string domain,
+        CancellationToken cancellationToken = default)
+    {
+        DomainEdgeOptions options = _domainOptions.GetDomainOptions(domain);
+        if (!options.Enabled)
+            return;
+
+        ResolvedEdgeInstance instance = _instances.Resolve(options.InstanceName);
+        await EnqueueAsync(
+            new EdgeDomainSnapshot(
+                options.Domain,
+                Version: string.Empty,
+                VersionIsRuntimeOverride: false,
                 Enabled: true,
                 options.PurgeOnStartup,
                 instance.Name,
@@ -146,6 +173,22 @@ internal sealed class EdgeDomainChangeMonitor : BackgroundService, IDomainVersio
             if (placementChanged)
                 await EnqueueOnceAsync(oldState!, queued, cancellationToken).ConfigureAwait(false);
 
+            bool newPlacementNeedsClean = newState is { Enabled: true }
+                && (oldState is not { Enabled: true } || !oldState.HasSamePlacement(newState));
+            if (newPlacementNeedsClean)
+                await EnqueueOnceAsync(newState!, queued, cancellationToken).ConfigureAwait(false);
+
+            bool edgeSafetyChanged = oldState is { Enabled: true }
+                && newState is { Enabled: true }
+                && (DomainSettingsInvalidationPlanner.Plan(
+                        EdgeSafetySettingIds,
+                        oldState.EdgeSafetyValues,
+                        newState.EdgeSafetyValues,
+                        applyImmediately: false)
+                    & DomainSettingsInvalidationTargets.Edge) != 0;
+            if (edgeSafetyChanged)
+                await EnqueueOnceAsync(newState!, queued, cancellationToken).ConfigureAwait(false);
+
             bool configuredVersionChanged = oldState is not null
                 && newState is { Enabled: true, VersionIsRuntimeOverride: false }
                 && !oldState.VersionIsRuntimeOverride
@@ -171,14 +214,18 @@ internal sealed class EdgeDomainChangeMonitor : BackgroundService, IDomainVersio
     {
         IConfigurationSection section = _registration.Configuration.GetSection(_registration.ConfigSection);
         var core = new CacheOrchestratorOptions();
+        var http = new CacheOrchestratorHttpOptions();
         var edge = new CacheOrchestratorEdgeOptions();
         section.Bind(core);
+        section.Bind(http);
         section.Bind(edge);
 
         HashSet<string> domains = new(StringComparer.Ordinal);
         foreach (string domain in core.Domains.Keys)
             domains.Add(DomainName.Normalize(domain));
         foreach (string domain in edge.Domains.Keys)
+            domains.Add(DomainName.Normalize(domain));
+        foreach (string domain in http.Domains.Keys)
             domains.Add(DomainName.Normalize(domain));
         if (_runtimeOverrides is not null)
         {
@@ -207,7 +254,10 @@ internal sealed class EdgeDomainChangeMonitor : BackgroundService, IDomainVersio
             }
 
             DomainRuntimeOverride? runtimeOverride = _runtimeOverrides?.Get(domain);
+            HttpDomainRuntimeOverride? httpOverride = _httpRuntimeOverrides?.Get(domain);
             core.Domains.TryGetValue(domain, out CacheOrchestratorOptions.DomainCacheSettings? domainSettings);
+            http.Domains.TryGetValue(domain, out DomainHttpCacheSettings? httpSettings);
+            httpSettings ??= new DomainHttpCacheSettings();
             string version = runtimeOverride?.Version
                 ?? domainSettings?.Version
                 ?? core.DomainDefaults.Version
@@ -221,7 +271,8 @@ internal sealed class EdgeDomainChangeMonitor : BackgroundService, IDomainVersio
                 purgeOnStartup,
                 instanceName,
                 providerName,
-                tagNamespace));
+                tagNamespace,
+                CaptureEdgeSafetyValues(httpSettings, http.DomainDefaults, httpOverride)));
         }
 
         return snapshot;
@@ -257,6 +308,54 @@ internal sealed class EdgeDomainChangeMonitor : BackgroundService, IDomainVersio
     }
 
     private readonly record struct EdgePurgeIdentity(string InstanceName, string ProviderName, string TagNamespace);
+
+    private static readonly string[] EdgeSafetySettingIds =
+    [
+        "authBypassMode",
+        "treatAuthorizationAsAuthSignal",
+        "varyByAccept",
+        "varyByAcceptLanguage",
+        "varyByHeaders",
+        "emitResponseVary",
+        "clientCache.cacheability",
+        "clientCache.forcePrivateWhenAuthenticated"
+    ];
+
+    private static IReadOnlyDictionary<string, JsonElement> CaptureEdgeSafetyValues(
+        DomainHttpCacheSettings domain,
+        DomainHttpCacheSettings defaults,
+        HttpDomainRuntimeOverride? overlay)
+    {
+        static T Pick<T>(T? specific, T? global, T fallback) where T : struct =>
+            specific ?? global ?? fallback;
+
+        return new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["authBypassMode"] = JsonSerializer.SerializeToElement(
+                (overlay?.AuthBypassMode ?? domain.AuthBypassMode ?? defaults.AuthBypassMode
+                    ?? AuthBypassMode.AuthenticatedOrAuthorization).ToString()),
+            ["treatAuthorizationAsAuthSignal"] = JsonSerializer.SerializeToElement(
+                overlay?.TreatAuthorizationAsAuthSignal
+                    ?? Pick(domain.TreatAuthorizationAsAuthSignal, defaults.TreatAuthorizationAsAuthSignal, true)),
+            ["varyByAccept"] = JsonSerializer.SerializeToElement(
+                overlay?.VaryByAccept ?? Pick(domain.VaryByAccept, defaults.VaryByAccept, true)),
+            ["varyByAcceptLanguage"] = JsonSerializer.SerializeToElement(
+                overlay?.VaryByAcceptLanguage
+                    ?? Pick(domain.VaryByAcceptLanguage, defaults.VaryByAcceptLanguage, false)),
+            ["varyByHeaders"] = JsonSerializer.SerializeToElement(
+                overlay?.VaryByHeaders ?? domain.VaryByHeaders ?? defaults.VaryByHeaders ?? []),
+            ["emitResponseVary"] = JsonSerializer.SerializeToElement(
+                overlay?.EmitResponseVary ?? Pick(domain.EmitResponseVary, defaults.EmitResponseVary, true)),
+            ["clientCache.cacheability"] = JsonSerializer.SerializeToElement(
+                (overlay?.ClientCacheability ?? domain.ClientCache?.Cacheability
+                    ?? defaults.ClientCache?.Cacheability ?? ClientCacheability.Public).ToString()),
+            ["clientCache.forcePrivateWhenAuthenticated"] = JsonSerializer.SerializeToElement(
+                overlay?.ClientForcePrivateWhenAuthenticated
+                    ?? Pick(domain.ClientCache?.ForcePrivateWhenAuthenticated,
+                        defaults.ClientCache?.ForcePrivateWhenAuthenticated,
+                        true))
+        };
+    }
 }
 
 internal sealed record EdgeDomainSnapshot(
@@ -267,8 +366,12 @@ internal sealed record EdgeDomainSnapshot(
     bool PurgeOnStartup,
     string InstanceName,
     string ProviderName,
-    string TagNamespace)
+    string TagNamespace,
+    IReadOnlyDictionary<string, JsonElement>? EdgeSafetyValues = null)
 {
+    public IReadOnlyDictionary<string, JsonElement> EdgeSafetyValues { get; init; } =
+        EdgeSafetyValues ?? new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
+
     public bool HasSamePlacement(EdgeDomainSnapshot other) =>
         string.Equals(InstanceName, other.InstanceName, StringComparison.OrdinalIgnoreCase)
         && string.Equals(ProviderName, other.ProviderName, StringComparison.OrdinalIgnoreCase)

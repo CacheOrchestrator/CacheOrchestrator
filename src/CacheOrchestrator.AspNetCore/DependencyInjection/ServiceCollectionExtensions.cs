@@ -122,6 +122,8 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IHttpDomainRuntimeOverrideStore, HttpDomainRuntimeOverrideStore>();
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IDomainSettingsPatchContributor, HttpDomainSettingsPatchContributor>());
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IDomainSettingValueProvider, HttpDomainSettingValueProvider>());
         services.TryAddSingleton<IRequestDomainCacheOptions, RequestDomainCacheOptionsProvider>();
         services.RemoveAll<IAdminDomainConfigProvider>();
         services.AddSingleton<IAdminDomainConfigProvider, HttpAdminDomainConfigProvider>();

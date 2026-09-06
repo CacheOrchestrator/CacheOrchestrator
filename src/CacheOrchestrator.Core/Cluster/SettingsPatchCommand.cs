@@ -14,4 +14,7 @@ public sealed record SettingsPatchCommand : ClusterCommand
     /// Sparse camelCase setting map (same shape as Admin <c>PATCH …/settings</c>).
     /// </summary>
     public required Dictionary<string, JsonElement> Settings { get; init; }
+
+    /// <summary>Whether directional policy changes should evict affected local entries.</summary>
+    public bool ApplyImmediately { get; init; }
 }

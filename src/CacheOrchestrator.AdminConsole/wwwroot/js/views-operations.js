@@ -160,7 +160,11 @@ export async function renderOperations(params) {
     if (a === "settings") {
       panel.innerHTML = `
         <p class="muted small op-panel-hint">Choose one or more runtime settings, then Run. Overlay keys only (bool / enum / numbers / comma-separated string lists for vary allowlists).</p>
-        <div id="opSettingRows" class="op-setting-rows"></div>`;
+        <div id="opSettingRows" class="op-setting-rows"></div>
+        <label class="op-check">
+          <input id="opApplyImmediately" type="checkbox" />
+          Apply supported policy reductions immediately (invalidate affected entries)
+        </label>`;
       settingsCtrl = new SettingRowsController($("#opSettingRows"), catalog);
       settingsCtrl.render();
       return;
@@ -340,7 +344,10 @@ export async function renderOperations(params) {
         }
         result = await api(`/api/domains/${encodeURIComponent(dom)}/settings`, {
           method: "PATCH",
-          body: JSON.stringify({ settings: built.settings }),
+          body: JSON.stringify({
+            settings: built.settings,
+            applyImmediately: $("#opApplyImmediately")?.checked === true,
+          }),
         });
       }
       renderModeUsed(result);

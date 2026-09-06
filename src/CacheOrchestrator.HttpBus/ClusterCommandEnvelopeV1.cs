@@ -1,6 +1,7 @@
 using CacheOrchestrator.Cluster;
 using CacheOrchestrator.Invalidation;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace CacheOrchestrator.HttpBus;
 
@@ -28,6 +29,8 @@ internal sealed record ClusterCommandEnvelopeV1
     public IReadOnlyList<string>? ResourceIds { get; init; }
     public string? Version { get; init; }
     public Dictionary<string, JsonElement>? Settings { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool ApplyImmediately { get; init; }
 
     public static ClusterCommandEnvelopeV1 FromCommand(ClusterCommand command)
     {
@@ -53,7 +56,8 @@ internal sealed record ClusterCommandEnvelopeV1
             SettingsPatchCommand patch => CreateBase(patch, "settingsPatch") with
             {
                 Domain = patch.Domain,
-                Settings = patch.Settings
+                Settings = patch.Settings,
+                ApplyImmediately = patch.ApplyImmediately
             },
             _ => throw new NotSupportedException(
                 $"HTTP cluster protocol v1 does not support command type '{command.GetType().FullName}'.")
@@ -100,7 +104,8 @@ internal sealed record ClusterCommandEnvelopeV1
                 TimestampUtc = TimestampUtc,
                 CorrelationId = CorrelationId,
                 Domain = Require(Domain, nameof(Domain)),
-                Settings = Settings ?? throw new JsonException("settings is required for settingsPatch.")
+                Settings = Settings ?? throw new JsonException("settings is required for settingsPatch."),
+                ApplyImmediately = ApplyImmediately
             },
             _ => throw new JsonException($"Unsupported cluster command type '{CommandType}'.")
         };
