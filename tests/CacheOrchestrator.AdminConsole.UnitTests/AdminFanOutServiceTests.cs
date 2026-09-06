@@ -354,6 +354,7 @@ public class AdminFanOutServiceTests
                 {
                     ["outputCacheTtlSeconds"] = System.Text.Json.JsonSerializer.SerializeToElement(90),
                 },
+                ApplyImmediately = true,
             },
             TestContext.Current.CancellationToken);
 
@@ -361,6 +362,7 @@ public class AdminFanOutServiceTests
         result.Outcome.Should().Be(WriteOutcomes.Success);
         client.SettingsCalls.Should().BeEquivalentTo(["a:catalog", "b:catalog"]);
         client.LastSettingsBody!.Distribute.Should().BeFalse();
+        client.LastSettingsBody.ApplyImmediately.Should().BeTrue();
         client.LastSettingsBody.Settings!["outputCacheTtlSeconds"].GetInt32().Should().Be(90);
     }
 

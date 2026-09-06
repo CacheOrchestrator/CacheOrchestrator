@@ -56,7 +56,10 @@ internal sealed class ClusterCommandFactory
             Version = version
         };
 
-    public SettingsPatchCommand CreateSettingsPatch(string domain, Dictionary<string, System.Text.Json.JsonElement> settings) =>
+    public SettingsPatchCommand CreateSettingsPatch(
+        string domain,
+        Dictionary<string, System.Text.Json.JsonElement> settings,
+        bool applyImmediately) =>
         new()
         {
             CommandId = Guid.NewGuid(),
@@ -64,6 +67,7 @@ internal sealed class ClusterCommandFactory
             Namespace = _options.CurrentValue.Namespace ?? string.Empty,
             TimestampUtc = DateTimeOffset.UtcNow,
             Domain = domain,
-            Settings = settings
+            Settings = settings,
+            ApplyImmediately = applyImmediately
         };
 }

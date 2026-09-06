@@ -31,6 +31,7 @@ internal sealed class CacheOrchestratorManagement : ICacheOrchestratorManagement
     private readonly ILogger<CacheOrchestratorManagement> _logger;
     private readonly IDataCacheProvider _dataCacheProvider;
     private readonly IDomainVersionChangeObserver[] _versionChangeObservers;
+    private readonly DomainSettingsInvalidationCoordinator? _settingsInvalidation;
 
     public CacheOrchestratorManagement(
         IAdminStatsCollector stats,
@@ -48,7 +49,8 @@ internal sealed class CacheOrchestratorManagement : ICacheOrchestratorManagement
         IEnumerable<ICacheOrchestratorHealthProbe>? probes = null,
         IEnumerable<IDomainSettingsPatchContributor>? settingsContributors = null,
         IDataCacheProvider? dataCacheProvider = null,
-        IEnumerable<IDomainVersionChangeObserver>? versionChangeObservers = null)
+        IEnumerable<IDomainVersionChangeObserver>? versionChangeObservers = null,
+        DomainSettingsInvalidationCoordinator? settingsInvalidation = null)
     {
         ArgumentNullException.ThrowIfNull(stats);
         ArgumentNullException.ThrowIfNull(endpoints);
@@ -77,6 +79,7 @@ internal sealed class CacheOrchestratorManagement : ICacheOrchestratorManagement
         _settingsContributors = settingsContributors is null ? [] : [.. settingsContributors];
         _dataCacheProvider = dataCacheProvider ?? NullDataCacheProvider.Instance;
         _versionChangeObservers = versionChangeObservers is null ? [] : [.. versionChangeObservers];
+        _settingsInvalidation = settingsInvalidation;
     }
 
     public async Task<AdminHealthDto> GetHealthAsync(CancellationToken cancellationToken = default)
@@ -406,17 +409,31 @@ internal sealed class CacheOrchestratorManagement : ICacheOrchestratorManagement
             throw new ArgumentException("settings must contain at least one entry.", nameof(request));
 
         string normalizedDomain = DomainName.Normalize(domain);
+        string[] settingIds = DomainSettingsInvalidationCoordinator.CanonicalizeSettingIds(request.Settings.Keys);
+        IReadOnlyDictionary<string, System.Text.Json.JsonElement>? before =
+            _settingsInvalidation?.Capture(normalizedDomain, settingIds);
         DomainSettingsPatchApplicator.Apply(
             normalizedDomain,
             request.Settings,
             _overrides,
             _settingsContributors);
 
+        if (_settingsInvalidation is not null && before is not null)
+        {
+            await _settingsInvalidation.ApplyAsync(
+                    normalizedDomain,
+                    settingIds,
+                    before,
+                    request.ApplyImmediately,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         ClusterPublishResult? clusterPublish = null;
         if (request.Distribute && _bus.IsEnabled)
         {
             clusterPublish = await PublishMutationAsync(
-                    _commands.CreateSettingsPatch(normalizedDomain, request.Settings),
+                    _commands.CreateSettingsPatch(normalizedDomain, request.Settings, request.ApplyImmediately),
                     nameof(SettingsPatchCommand),
                     normalizedDomain,
                     cancellationToken)

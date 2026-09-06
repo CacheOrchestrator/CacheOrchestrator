@@ -331,6 +331,7 @@ public class DomainOutputCachePolicyTests
         ulong versionHash = XxHash3.HashToUInt64(Encoding.UTF8.GetBytes("v1"));
         context.CacheVaryByRules.VaryByValues["cache-domain"].ToString().Should().Be("products");
         context.CacheVaryByRules.VaryByValues["data-version"].ToString().Should().Be($"{versionHash:x16}");
+        context.CacheVaryByRules.VaryByValues.Should().ContainKey("cache-policy");
         context.CacheVaryByRules.CacheKeyPrefix.Should().Be("test-oc");
     }
 

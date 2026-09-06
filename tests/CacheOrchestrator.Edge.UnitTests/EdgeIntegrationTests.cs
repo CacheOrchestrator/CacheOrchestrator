@@ -242,6 +242,19 @@ public class EdgeIntegrationTests
     }
 
     [Fact]
+    public async Task SettingsChangeObserver_EdgeEnabled_EnqueuesProjectedDomainTag()
+    {
+        TestProvider provider = new();
+        (EdgeDomainChangeMonitor sut, RecordingQueue queue) = CreateVersionObserver(provider, enabled: true);
+
+        await sut.InvalidateDomainSettingsAsync("catalog", TestContext.Current.CancellationToken);
+
+        queue.Jobs.Should().ContainSingle();
+        queue.Jobs[0].Tags.Should().Equal(
+            new EdgeTagProjector().Project("test", CacheTags.Domain("catalog")));
+    }
+
+    [Fact]
     public async Task ConfigurationChange_VersionChanged_EnqueuesCurrentPlacement()
     {
         TestProvider provider = new();
@@ -271,6 +284,44 @@ public class EdgeIntegrationTests
         queue.Jobs.Should().ContainSingle();
         queue.Jobs[0].Tags.Should().Equal(
             new EdgeTagProjector().Project("old-ns", CacheTags.Domain("catalog")));
+    }
+
+    [Fact]
+    public async Task ConfigurationChange_EdgeEnabled_EnqueuesNewPlacement()
+    {
+        TestProvider provider = new();
+        (EdgeDomainChangeMonitor sut, RecordingQueue queue) = CreateVersionObserver(provider, enabled: true);
+
+        await sut.ApplyChangesAsync(
+            Snapshot(State(version: "v1", enabled: false)),
+            Snapshot(State(version: "v1", enabled: true)),
+            TestContext.Current.CancellationToken);
+
+        queue.Jobs.Should().ContainSingle();
+        queue.Jobs[0].Tags.Should().Equal(
+            new EdgeTagProjector().Project("new-ns", CacheTags.Domain("catalog")));
+    }
+
+    [Fact]
+    public async Task ConfigurationChange_EdgeSafetyPolicyChanged_EnqueuesCurrentPlacement()
+    {
+        TestProvider provider = new();
+        (EdgeDomainChangeMonitor sut, RecordingQueue queue) = CreateVersionObserver(provider, enabled: true);
+        EdgeDomainSnapshot previous = State(version: "v1") with
+        {
+            EdgeSafetyValues = SafetyValues(("varyByHeaders", new[] { "X-Tenant" }))
+        };
+        EdgeDomainSnapshot current = State(version: "v1") with
+        {
+            EdgeSafetyValues = SafetyValues(("varyByHeaders", new[] { "X-Tenant", "X-Locale" }))
+        };
+
+        await sut.ApplyChangesAsync(
+            Snapshot(previous),
+            Snapshot(current),
+            TestContext.Current.CancellationToken);
+
+        queue.Jobs.Should().ContainSingle();
     }
 
     [Fact]
@@ -378,6 +429,13 @@ public class EdgeIntegrationTests
             instanceName,
             "Test",
             tagNamespace);
+
+    private static IReadOnlyDictionary<string, System.Text.Json.JsonElement> SafetyValues(
+        params (string Id, object Value)[] entries) =>
+        entries.ToDictionary(
+            static entry => entry.Id,
+            static entry => System.Text.Json.JsonSerializer.SerializeToElement(entry.Value),
+            StringComparer.OrdinalIgnoreCase);
 
     private static (EdgeResponseContributor Response, EdgeInvalidationObserver Observer, RecordingQueue Queue) Create(
         TestProvider provider,

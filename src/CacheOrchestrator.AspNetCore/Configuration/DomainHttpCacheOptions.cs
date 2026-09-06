@@ -130,4 +130,10 @@ public sealed class DomainHttpCacheOptions
 
     /// <summary>Whether Output Cache keys vary by request host.</summary>
     public bool OutputCacheVaryByHost { get; init; } = true;
+
+    /// <summary>Stable generation for Output Cache key-shaping settings.</summary>
+    internal string OutputCachePolicyGeneration { get; set; } = string.Empty;
+
+    /// <summary>Stable generation for HTTP-derived Data Cache key-shaping settings.</summary>
+    internal string DataCachePolicyGeneration { get; set; } = string.Empty;
 }

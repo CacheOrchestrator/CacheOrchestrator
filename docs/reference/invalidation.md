@@ -232,7 +232,7 @@ An Edge-enabled domain is also purged when its `Version` changes. Changing `Clie
 
 `CacheInvalidationResult.Succeeded` describes local Data Cache/Output Cache eviction, not successful Edge queueing or completed provider purge. Observe Edge metrics and logs separately.
 
-Cluster **configuration** management (shared `appsettings.cache.json`, ConfigMap, env) does **not** by itself purge L1/L2 on other nodes. It only keeps **policy** in sync (Version, TTLs). See [deployment.md — Shared configuration](deployment.md#shared-configuration-across-instances).
+Cluster **configuration** management (shared `appsettings.cache.json`, ConfigMap, env) does not fan out a physical L1/L2 purge. Each node independently applies the reloaded policy: OC/DC key-shaping changes select a new deterministic key generation, Version selects a new content generation, and enabled Edge domains are purged for Version or Edge-safety changes. Other settings affect new entries while existing entries keep their creation policy until expiration. See [configuration — change activation and invalidation](configuration.md#domain-setting-change-activation-and-invalidation) and [deployment — Shared configuration](deployment.md#shared-configuration-across-instances).
 
 ### Approaches
 

@@ -44,6 +44,8 @@ public static class CacheOrchestratorFusionCacheServiceExtensions
         services.TryAddSingleton<IFusionDomainRuntimeOverrideStore, FusionDomainRuntimeOverrideStore>();
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IDomainSettingsPatchContributor, FusionDomainSettingsPatchContributor>());
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IDomainSettingValueProvider, FusionDomainSettingValueProvider>());
 
         if (configuration is not null)
             services.TryAddSingleton(configuration);

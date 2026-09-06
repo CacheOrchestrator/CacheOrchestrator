@@ -335,6 +335,7 @@ public sealed class DomainOutputCachePolicy : IOutputCachePolicy, IFilterMetadat
         context.CacheVaryByRules.CacheKeyPrefix = opts.OutputCacheNamespace;
         context.CacheVaryByRules.VaryByValues["cache-domain"] = opts.Domain;
         context.CacheVaryByRules.VaryByValues["data-version"] = opts.VersionHex;
+        context.CacheVaryByRules.VaryByValues["cache-policy"] = opts.OutputCachePolicyGeneration;
 
         foreach ((string key, string value) in vary.Values)
             context.CacheVaryByRules.VaryByValues[key] = value;

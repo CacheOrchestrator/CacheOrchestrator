@@ -31,4 +31,7 @@ public sealed class AdminConsoleSettingsPatchRequest
 {
     /// <summary>CamelCase setting id → JSON value (overlay catalog entries only).</summary>
     public Dictionary<string, System.Text.Json.JsonElement>? Settings { get; set; }
+
+    /// <summary>Whether supported policy reductions should invalidate affected entries immediately.</summary>
+    public bool ApplyImmediately { get; set; }
 }

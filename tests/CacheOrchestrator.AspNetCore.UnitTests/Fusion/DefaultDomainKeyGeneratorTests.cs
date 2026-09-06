@@ -156,6 +156,48 @@ public class DefaultDomainKeyGeneratorTests
         key1.Should().NotBe(key2);
     }
 
+    [Fact]
+    public void Generate_WhenDataKeyPolicyChanges_UsesDifferentGeneration()
+    {
+        DefaultHttpContext http = CreateHttpContext();
+        var first = new DomainHttpCacheOptions
+        {
+            CoreOptions = CreateCoreOptions("products", "1"),
+            DataCacheVaryOnPublicAddress = false
+        };
+        var second = new DomainHttpCacheOptions
+        {
+            CoreOptions = CreateCoreOptions("products", "1"),
+            DataCacheVaryOnPublicAddress = true
+        };
+        DomainCachePolicyGeneration.Apply(first);
+        DomainCachePolicyGeneration.Apply(second);
+
+        _sut.Generate(first, http).Should().NotBe(_sut.Generate(second, http));
+    }
+
+    [Fact]
+    public void PolicyGeneration_WhenOnlyTtlChanges_RemainsStable()
+    {
+        var first = new DomainHttpCacheOptions
+        {
+            CoreOptions = CreateCoreOptions("products", "1"),
+            OutputTtl = TimeSpan.FromSeconds(600),
+            ClientTtlSeconds = 600
+        };
+        var second = new DomainHttpCacheOptions
+        {
+            CoreOptions = CreateCoreOptions("products", "1"),
+            OutputTtl = TimeSpan.FromSeconds(300),
+            ClientTtlSeconds = 300
+        };
+        DomainCachePolicyGeneration.Apply(first);
+        DomainCachePolicyGeneration.Apply(second);
+
+        second.OutputCachePolicyGeneration.Should().Be(first.OutputCachePolicyGeneration);
+        second.DataCachePolicyGeneration.Should().Be(first.DataCachePolicyGeneration);
+    }
+
     // =========================
     // Path / Route
     // =========================

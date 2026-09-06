@@ -330,6 +330,7 @@ public sealed class AdminFanOutService
         {
             Settings = request.Settings,
             Distribute = plan.Distribute,
+            ApplyImmediately = request.ApplyImmediately,
         };
 
         List<InstanceCallOutcome<AdminDomainMutationResultDto>> outcomes =

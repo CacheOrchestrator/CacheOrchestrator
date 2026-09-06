@@ -177,6 +177,7 @@ public sealed class AdminInvalidateRequest
     /// Programmatic <c>ICacheOrchestratorInvalidator</c> always publishes when the bus is enabled.
     /// </summary>
     public bool Distribute { get; set; }
+
 }
 
 /// <summary>Version set/bump request body.</summary>
@@ -205,6 +206,12 @@ public sealed class AdminSettingsPatchRequest
     /// Default <see langword="false"/> = this process only.
     /// </summary>
     public bool Distribute { get; set; }
+
+    /// <summary>
+    /// When <see langword="true"/>, changes that shorten an existing cache policy also evict
+    /// affected entries. Default <see langword="false"/> lets entries retain their creation policy.
+    /// </summary>
+    public bool ApplyImmediately { get; set; }
 }
 
 /// <summary>Domain settings catalog response.</summary>

@@ -1,4 +1,8 @@
 #nullable enable
+CacheOrchestrator.Admin.AdminSettingsPatchRequest.ApplyImmediately.get -> bool
+CacheOrchestrator.Admin.AdminSettingsPatchRequest.ApplyImmediately.set -> void
+CacheOrchestrator.Cluster.SettingsPatchCommand.ApplyImmediately.get -> bool
+CacheOrchestrator.Cluster.SettingsPatchCommand.ApplyImmediately.init -> void
 CacheOrchestrator.Admin.IDomainVersionChangeObserver
 CacheOrchestrator.Admin.IDomainVersionChangeObserver.OnDomainVersionChangedAsync(string! domain, string! version, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 CacheOrchestrator.Admin.AdminFactoryRecord

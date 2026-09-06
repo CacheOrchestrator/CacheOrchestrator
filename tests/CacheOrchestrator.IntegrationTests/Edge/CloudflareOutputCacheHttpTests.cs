@@ -91,6 +91,21 @@ public class CloudflareOutputCacheHttpTests
         using HttpResponseMessage rescheduled = await client.GetAsync("/catalog", TestContext.Current.CancellationToken);
         GetCloudflareMaxAge(rescheduled).Should().Be(600);
         queue.Jobs.Should().BeEmpty();
+
+        await app.Services.GetRequiredService<ICacheOrchestratorManagement>().PatchSettingsAsync(
+            "catalog",
+            new AdminSettingsPatchRequest
+            {
+                Settings = new Dictionary<string, JsonElement>
+                {
+                    ["clientCache.scheduledUpdateUtc"] = JsonSerializer.SerializeToElement(
+                        time.GetUtcNow().AddSeconds(120).ToString("O"))
+                },
+                ApplyImmediately = true
+            },
+            TestContext.Current.CancellationToken);
+
+        queue.Jobs.Should().ContainSingle();
     }
 
     [Fact]
@@ -172,10 +187,12 @@ public class CloudflareOutputCacheHttpTests
 
         reload.Provider!.SetAndReload("Cache:Domains:catalog:Version", "v2");
         await WaitForJobsAsync(queue, 1);
-        reload.Provider.SetAndReload("Cache:Domains:catalog:Edge:Enabled", "false");
+        reload.Provider.SetAndReload("Cache:Domains:catalog:VaryByHeaders:0", "X-Tenant");
         await WaitForJobsAsync(queue, 2);
+        reload.Provider.SetAndReload("Cache:Domains:catalog:Edge:Enabled", "false");
+        await WaitForJobsAsync(queue, 3);
 
-        queue.Jobs.Should().HaveCount(2);
+        queue.Jobs.Should().HaveCount(3);
         queue.Jobs.Should().OnlyContain(job => job.Tags.Single() ==
             new EdgeTagProjector().Project("edge-reload-edge-edge", CacheTags.Domain("catalog")));
     }
