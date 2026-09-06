@@ -35,6 +35,8 @@ CacheOrchestrator.Edge.Configuration.DomainEdgeOptions.Domain.init -> void
 CacheOrchestrator.Edge.Configuration.DomainEdgeOptions.DomainEdgeOptions() -> void
 CacheOrchestrator.Edge.Configuration.DomainEdgeOptions.Enabled.get -> bool
 CacheOrchestrator.Edge.Configuration.DomainEdgeOptions.Enabled.init -> void
+CacheOrchestrator.Edge.Configuration.DomainEdgeOptions.PurgeOnStartup.get -> bool
+CacheOrchestrator.Edge.Configuration.DomainEdgeOptions.PurgeOnStartup.init -> void
 CacheOrchestrator.Edge.Configuration.DomainEdgeOptions.InstanceName.get -> string!
 CacheOrchestrator.Edge.Configuration.DomainEdgeOptions.InstanceName.init -> void
 CacheOrchestrator.Edge.Configuration.DomainEdgeOptions.StaleIfError.get -> System.TimeSpan?
@@ -47,6 +49,8 @@ CacheOrchestrator.Edge.Configuration.DomainEdgeSettings
 CacheOrchestrator.Edge.Configuration.DomainEdgeSettings.DomainEdgeSettings() -> void
 CacheOrchestrator.Edge.Configuration.DomainEdgeSettings.Enabled.get -> bool?
 CacheOrchestrator.Edge.Configuration.DomainEdgeSettings.Enabled.set -> void
+CacheOrchestrator.Edge.Configuration.DomainEdgeSettings.PurgeOnStartup.get -> bool?
+CacheOrchestrator.Edge.Configuration.DomainEdgeSettings.PurgeOnStartup.set -> void
 CacheOrchestrator.Edge.Configuration.DomainEdgeSettings.Instance.get -> string?
 CacheOrchestrator.Edge.Configuration.DomainEdgeSettings.Instance.set -> void
 CacheOrchestrator.Edge.Configuration.DomainEdgeSettings.StaleIfErrorSeconds.get -> int?

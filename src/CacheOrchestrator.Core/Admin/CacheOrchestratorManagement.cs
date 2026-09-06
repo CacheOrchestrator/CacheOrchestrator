@@ -30,6 +30,7 @@ internal sealed class CacheOrchestratorManagement : ICacheOrchestratorManagement
     private readonly IDomainSettingsPatchContributor[] _settingsContributors;
     private readonly ILogger<CacheOrchestratorManagement> _logger;
     private readonly IDataCacheProvider _dataCacheProvider;
+    private readonly IDomainVersionChangeObserver[] _versionChangeObservers;
 
     public CacheOrchestratorManagement(
         IAdminStatsCollector stats,
@@ -46,7 +47,8 @@ internal sealed class CacheOrchestratorManagement : ICacheOrchestratorManagement
         TimeProvider? timeProvider = null,
         IEnumerable<ICacheOrchestratorHealthProbe>? probes = null,
         IEnumerable<IDomainSettingsPatchContributor>? settingsContributors = null,
-        IDataCacheProvider? dataCacheProvider = null)
+        IDataCacheProvider? dataCacheProvider = null,
+        IEnumerable<IDomainVersionChangeObserver>? versionChangeObservers = null)
     {
         ArgumentNullException.ThrowIfNull(stats);
         ArgumentNullException.ThrowIfNull(endpoints);
@@ -74,6 +76,7 @@ internal sealed class CacheOrchestratorManagement : ICacheOrchestratorManagement
         _probes = probes is null ? [] : [.. probes];
         _settingsContributors = settingsContributors is null ? [] : [.. settingsContributors];
         _dataCacheProvider = dataCacheProvider ?? NullDataCacheProvider.Instance;
+        _versionChangeObservers = versionChangeObservers is null ? [] : [.. versionChangeObservers];
     }
 
     public async Task<AdminHealthDto> GetHealthAsync(CancellationToken cancellationToken = default)
@@ -355,6 +358,23 @@ internal sealed class CacheOrchestratorManagement : ICacheOrchestratorManagement
             : requested.Trim();
 
         _overrides.SetVersion(normalizedDomain, version);
+
+        for (int i = 0; i < _versionChangeObservers.Length; i++)
+        {
+            IDomainVersionChangeObserver observer = _versionChangeObservers[i];
+            try
+            {
+                await observer.OnDomainVersionChangedAsync(normalizedDomain, version, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "IDomainVersionChangeObserver.OnDomainVersionChangedAsync failed ({Observer})",
+                    observer.GetType().Name);
+            }
+        }
 
         ClusterPublishResult? clusterPublish = null;
         if (request?.Distribute == true && _bus.IsEnabled)

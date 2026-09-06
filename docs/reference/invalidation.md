@@ -38,7 +38,7 @@ When you deploy a content update, bump `Version` (and reload configuration).
 - Data Cache keys include the version hex
 - Old entries expire by TTL (no mass delete)
 
-A version change alone does not enqueue an Edge purge. To retire existing Edge URLs before their TTL expires, also call `InvalidateDomainAsync` with the domain's [Edge integration](../guide/edge.md) enabled, or use the provider's purge mechanism. Browser copies retain the cache policy they received.
+For an Edge-enabled domain, a Version change through configuration reload or the Management/Admin API automatically enqueues a domain-tag purge. HttpBus peers apply a distributed runtime Version without duplicating the origin's Edge purge; shared configuration reloads are observed independently by every process and may enqueue idempotent duplicates. Browser copies retain the cache policy they received.
 
 If `Version` is omitted, the library uses `"1"` and logs a warning (keys stable across restarts).
 

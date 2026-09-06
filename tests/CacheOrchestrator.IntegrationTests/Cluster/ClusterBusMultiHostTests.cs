@@ -2,6 +2,9 @@ using CacheOrchestrator.Admin;
 using CacheOrchestrator.Cluster;
 using CacheOrchestrator.DataCache;
 using CacheOrchestrator.DependencyInjection;
+using CacheOrchestrator.Edge.DependencyInjection;
+using CacheOrchestrator.Edge.Invalidation;
+using CacheOrchestrator.Edge.Providers;
 using CacheOrchestrator.HttpBus;
 using CacheOrchestrator.Invalidation;
 using CacheOrchestrator.OutputCache;
@@ -13,6 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Net;
+using System.Collections.Concurrent;
 using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Text;
@@ -87,7 +91,8 @@ public class ClusterBusMultiHostTests
         string? apiKey,
         bool adminEnabled,
         string membership = "Static",
-        Dictionary<string, string?>? extraConfig = null)
+        Dictionary<string, string?>? extraConfig = null,
+        Action<IServiceCollection, IConfiguration>? configureServices = null)
     {
         Dictionary<string, string?> configValues = new()
         {
@@ -146,6 +151,7 @@ public class ClusterBusMultiHostTests
         builder.Services.AddCacheOrchestratorAspNetCore(builder.Configuration, o => o.AddHttpClusterBus(), enableMvcConvention: false);
         builder.Services.AddCacheOrchestratorFusionCache(builder.Configuration);
         builder.Services.AddSingleton<HitCounter>();
+        configureServices?.Invoke(builder.Services, builder.Configuration);
 
         WebApplication app = builder.Build();
         app.UseRouting();
@@ -462,6 +468,58 @@ public class ClusterBusMultiHostTests
     }
 
     [Fact]
+    public async Task AdminDistributeTrue_VersionBump_QueuesEdgePurgeOnlyOnOrigin()
+    {
+        int portA = GetFreePort();
+        int portB = GetFreePort();
+        string urlA = $"http://127.0.0.1:{portA}";
+        string urlB = $"http://127.0.0.1:{portB}";
+        string ns = "it-edge-ver-" + Guid.NewGuid().ToString("N")[..8];
+        string domain = "tiles";
+        (string Id, string Url)[] peers = [("node-a", urlA), ("node-b", urlB)];
+        Dictionary<string, string?> edgeConfig = new()
+        {
+            ["Cache:EdgeInstances:edge:Provider"] = "Test",
+            [$"Cache:Domains:{domain}:Edge:Enabled"] = "true",
+            [$"Cache:Domains:{domain}:Edge:Instance"] = "edge"
+        };
+        var queueA = new RecordingEdgeQueue();
+        var queueB = new RecordingEdgeQueue();
+
+        await using ClusterHost a = await StartHostOnPortAsync(
+            "node-a", ns, domain, "/api/t", portA, peers, "k", true,
+            extraConfig: edgeConfig,
+            configureServices: (services, configuration) => AddTestEdge(services, configuration, queueA));
+        await using ClusterHost b = await StartHostOnPortAsync(
+            "node-b", ns, domain, "/api/t", portB, peers, "k", true,
+            extraConfig: edgeConfig,
+            configureServices: (services, configuration) => AddTestEdge(services, configuration, queueB));
+
+        using StringContent body = new(
+            """{"version":"cluster-v9","distribute":true}""",
+            Encoding.UTF8,
+            "application/json");
+        (await a.Client.PostAsync($"/cache-admin/local/domains/{domain}/version", body, Ct))
+            .EnsureSuccessStatusCode();
+
+        DateTimeOffset timeout = DateTimeOffset.UtcNow.AddSeconds(5);
+        AdminDomainConfigDto? peerDomain = null;
+        while (DateTimeOffset.UtcNow < timeout)
+        {
+            peerDomain = await b.Client.GetFromJsonAsync<AdminDomainConfigDto>(
+                $"/cache-admin/local/domains/{domain}",
+                Ct);
+            if (peerDomain?.Version == "cluster-v9")
+                break;
+            await Task.Delay(25, Ct);
+        }
+
+        peerDomain!.Version.Should().Be("cluster-v9");
+        queueA.Jobs.Should().ContainSingle();
+        queueB.Jobs.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task AdminDistributeFalse_DoesNotPublishVersionToPeer()
     {
         string ns = "it-loc-" + Guid.NewGuid().ToString("N")[..8];
@@ -767,5 +825,51 @@ public class ClusterBusMultiHostTests
 
         (await host.Client.GetAsync("/api/x", Ct)).EnsureSuccessStatusCode();
         host.Hits.Count.Should().Be(2, "local Output Cache must still be evicted");
+    }
+
+    private static void AddTestEdge(
+        IServiceCollection services,
+        IConfiguration configuration,
+        RecordingEdgeQueue queue)
+    {
+        var provider = new TestEdgeProvider();
+        services.AddSingleton<IEdgeResponseProvider>(provider);
+        services.AddSingleton<IEdgeInvalidationProvider>(provider);
+        services.AddSingleton<IEdgeInvalidationQueue>(queue);
+        services.AddCacheOrchestratorEdge(configuration);
+    }
+
+    private sealed class RecordingEdgeQueue : IEdgeInvalidationQueue
+    {
+        public ConcurrentQueue<EdgeInvalidationJob> Jobs { get; } = new();
+
+        public ValueTask EnqueueAsync(EdgeInvalidationJob job, CancellationToken cancellationToken)
+        {
+            Jobs.Enqueue(job);
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class TestEdgeProvider : IEdgeResponseProvider, IEdgeInvalidationProvider
+    {
+        public string Name => "Test";
+
+        public EdgeProviderCapabilities Capabilities { get; } = new()
+        {
+            SupportsTagInvalidation = true,
+            MaxResponseTagBytes = 16 * 1024,
+            MaxInvalidationBatchSize = 100,
+            SupportsStaleWhileRevalidate = true,
+            SupportsStaleIfError = true
+        };
+
+        public void ApplyResponseMetadata(HttpResponse response, EdgeResponseMetadata metadata)
+        {
+        }
+
+        public ValueTask<EdgeInvalidationResult> InvalidateAsync(
+            EdgeInvalidationRequest request,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(EdgeInvalidationResult.Success);
     }
 }

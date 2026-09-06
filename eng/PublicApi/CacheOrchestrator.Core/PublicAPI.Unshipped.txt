@@ -1,4 +1,6 @@
 #nullable enable
+CacheOrchestrator.Admin.IDomainVersionChangeObserver
+CacheOrchestrator.Admin.IDomainVersionChangeObserver.OnDomainVersionChangedAsync(string! domain, string! version, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 CacheOrchestrator.Admin.AdminFactoryRecord
 CacheOrchestrator.Admin.AdminFactoryRecord.AdminFactoryRecord() -> void
 CacheOrchestrator.Admin.AdminFactoryRecord.Domain.get -> string?

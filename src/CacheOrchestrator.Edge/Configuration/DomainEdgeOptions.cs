@@ -9,6 +9,9 @@ public sealed class DomainEdgeOptions
     /// <summary>Whether Edge cache integration is enabled.</summary>
     public bool Enabled { get; init; }
 
+    /// <summary>Whether the domain tag is purged when the application starts.</summary>
+    public bool PurgeOnStartup { get; init; }
+
     /// <summary>Name of the configured edge instance.</summary>
     public string InstanceName { get; init; } = string.Empty;
 
