@@ -13,10 +13,10 @@ Start with the [root README](../README.md) for the product overview and quick st
 5. [Topologies](guide/topologies.md) — InMemory, Redis, HttpBus, mixed
 6. [Edge cache integration](guide/edge.md) — Cloudflare/Varnish edge TTL, opaque tags, and queued invalidation
 7. [Client Cache Schedule](guide/client-cache-schedule.md) — client `max-age` before a cutover
-8. [Operations](guide/operations.md) — diagnostics map, Admin API vs Admin Console App
-9. [Comparison](guide/comparison.md) — hand-rolled stack vs this library
-   - [Worked example: one endpoint](guide/comparison-endpoint-example.md) — with CO first, then hand-rolled (vary, CCS, ETag, …)  
-9. [FAQ](guide/faq.md) — common mistakes
+8. [Client cache busting and invalidation](guide/client-invalidation.md) — domain version cache busting and entity synchronization
+9. [Operations](guide/operations.md) — diagnostics map, Admin API vs Admin Console App
+10. [Comparison](guide/comparison.md) — hand-rolled stack vs this library
+11. [FAQ](guide/faq.md) — common mistakes
 
 ### Learn by running
 
@@ -67,6 +67,7 @@ The reference describes exact configuration paths, API contracts, key material, 
 | Invalidate one changed record and every view that contains it | [Entity footprint](reference/entity-footprint.md) → [Invalidation](reference/invalidation.md) → [EF Core invalidation](reference/ef-core-invalidation.md) |
 | Design a multi-instance deployment | [Backends](reference/backends.md) → [Deployment](reference/deployment.md) → [Cluster bus](reference/cluster-bus.md) |
 | Extend entity invalidation to Cloudflare or Varnish | [Edge cache integration](guide/edge.md) → [Invalidation](reference/invalidation.md) → [Deployment](reference/deployment.md) |
+| Refresh browser data after a publication or write | [Client Cache Schedule](guide/client-cache-schedule.md) → [Client cache busting and invalidation](guide/client-invalidation.md) |
 | Diagnose hit rate or factory load | [Observability](reference/observability.md) → [Admin](reference/admin.md) |
 | Integrate custom identity, storage, health, or command transport | [Extensibility](reference/extensibility.md) → the linked contract page |
 

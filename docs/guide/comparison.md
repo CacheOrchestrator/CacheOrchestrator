@@ -228,7 +228,7 @@ Direct ASP.NET Core or engine APIs can be the clearer choice when:
 - an existing cache-key and invalidation architecture is already mature and consistent;
 - adopting another configuration and diagnostics model would add more concepts than it removes.
 
-CacheOrchestrator is intentionally not a Redis operations layer, CDN control plane, replacement for FusionCache or HybridCache features, or guarantee of cross-instance consistency without the required topology.
+CacheOrchestrator does not manage Redis operations or general CDN administration, replace FusionCache or HybridCache features, or guarantee cross-instance consistency without the required topology. Its optional [Edge integration](edge.md) does configure response freshness metadata and queue provider-specific tag invalidation.
 
 ## Adopt it incrementally
 

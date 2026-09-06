@@ -267,7 +267,7 @@ The response now contains price `12.50`. Because the old HTTP response and cache
 You have now used one domain definition to coordinate Client Cache, Output Cache, and Data Cache, then invalidated one logical entity across the server-side layers.
 
 > [!NOTE]
-> A client that already cached a public GET response may keep it until its `max-age` expires. Server-side invalidation cannot recall a response already stored by a browser or CDN. Choose the client TTL to match how quickly clients must observe unscheduled changes. For planned cutovers, see [Client Cache Schedule](client-cache-schedule.md).
+> A browser that already cached a public GET response may keep it until its `max-age` expires; server invalidation cannot recall that copy. Choose the client TTL to match how quickly clients must observe unscheduled changes. For planned cutovers, see [Client Cache Schedule](client-cache-schedule.md). CDN copies can be invalidated through the optional [Edge cache integration](edge.md), which queues provider-specific tag purges; this quick start does not configure it.
 
 ## What to read next
 
@@ -275,6 +275,7 @@ You have now used one domain definition to coordinate Client Cache, Output Cache
 |------|------|
 | Understand domains, versions, and the three layers | [Concepts](concepts.md) |
 | Choose policies for snapshots and CRUD data | [Domain profiles](domain-profiles.md) |
+| Bypass browser cache or refresh client views after a write | [Client cache busting and invalidation](client-invalidation.md) |
 | Use a real database and automatic EF Core invalidation | [EF Core invalidation](../reference/ef-core-invalidation.md) |
 | Move the cache stores to Redis | [Packages](packages.md) · [Composition](../how-to/composition.md) |
 | Inspect every `X-CacheOrchestrator` field and metric | [Observability](../reference/observability.md) |

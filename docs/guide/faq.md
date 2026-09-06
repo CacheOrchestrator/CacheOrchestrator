@@ -63,7 +63,8 @@ later Output Cache miss:  oc=miss; dc=hit
 
 First identify the layer:
 
-- a browser or CDN may still hold a response until its `max-age` ends;
+- a browser may still hold a response until its `max-age` ends;
+- an Edge purge may still be queued, retrying, or failed, or the CDN may not have a configured CO Edge integration;
 - another application instance may have local Output Cache without HttpBus;
 - the invalidated entry may lack the expected entity footprint;
 - a conditional request may receive `304 Not Modified` from a generation-bound ETag;
@@ -163,9 +164,15 @@ Output Cache, Data Cache, and FusionCache engine TTLs remain independent. See [C
 
 ### Can server invalidation purge a browser or CDN?
 
-No. CacheOrchestrator invalidates the configured server-side layers. A client may use a response until its current `max-age` expires, and a CDN may also have its own purge control plane.
+**Browser: no.** Server invalidation cannot remove a response already stored in the browser; it may be reused until its current `max-age` expires.
+
+**CDN/Edge: yes, with the optional Edge integration configured for the domain.** CO projects the same domain/entity tags and queues provider-specific invalidation for Cloudflare or Varnish. A custom tag-native provider can use the same extension points. Without that integration, use the CDN's own purge mechanism.
+
+Edge purge runs asynchronously. The built-in queue batches requests and retries transient failures, but is in-memory and best-effort. `CacheInvalidationResult.Succeeded` reports local Data Cache/Output Cache success, not completion of the external purge. See [Edge cache integration](edge.md) for setup and delivery behaviour.
 
 Choose client TTLs based on the maximum acceptable client staleness. Use Client Cache Schedule for known snapshot cutovers.
+
+If your application needs to refresh sooner, see [Client cache busting and invalidation](client-invalidation.md) for domain version cache busting and entity synchronization.
 
 ### Why did an EF Core bulk update not invalidate anything?
 
