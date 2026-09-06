@@ -6,6 +6,8 @@ When data changes, retire it in **every** layer that still holds it — Data Cac
 
 Prefer **`ICacheOrchestratorInvalidator`** over talking to Data Cache or Output Cache stores directly. Multi-instance behaviour depends on topology ([deployment](deployment.md), [cluster bus](cluster-bus.md)).
 
+Server invalidation cannot recall responses already cached by a browser. For application-owned versioned URLs and client refresh after writes, see [Client cache busting and invalidation](../guide/client-invalidation.md).
+
 ## Table of Contents
 
 - [Version (preferred for bulk cutovers)](#version-preferred-for-bulk-cutovers)
@@ -35,6 +37,8 @@ When you deploy a content update, bump `Version` (and reload configuration).
 - Output Cache vary value `data-version` changes  
 - Data Cache keys include the version hex
 - Old entries expire by TTL (no mass delete)
+
+A version change alone does not enqueue an Edge purge. To retire existing Edge URLs before their TTL expires, also call `InvalidateDomainAsync` with the domain's [Edge integration](../guide/edge.md) enabled, or use the provider's purge mechanism. Browser copies retain the cache policy they received.
 
 If `Version` is omitted, the library uses `"1"` and logs a warning (keys stable across restarts).
 
@@ -220,9 +224,11 @@ List/index endpoints tagged only `domain:{name}` are not refreshed by row invali
 | Fusion L2 | N/A or local only | Shared store purged |
 | Output Cache | In-process only (unless HttpBus peers also apply the command) | Shared when the Output Cache provider is Redis |
 
-Without a distributed store, a backplane, or HttpBus, invalidation applies on the calling process only.
+For origin caches, without a distributed store, a backplane, or HttpBus, invalidation applies on the calling process only. The optional Edge integration below independently queues external invalidation.
 
 When `CacheOrchestrator.Edge` is enabled for a domain, the initiating process also queues an external tag purge after local invalidation. HttpBus peers apply their local invalidation but do not enqueue duplicate edge requests. The built-in bounded queue coalesces and retries in memory; it is best-effort and can lose pending work on a crash. It drains during graceful host shutdown. See [Edge cache integration](../guide/edge.md).
+
+`CacheInvalidationResult.Succeeded` describes local Data Cache/Output Cache eviction, not successful Edge queueing or completed provider purge. Observe Edge metrics and logs separately.
 
 Cluster **configuration** management (shared `appsettings.cache.json`, ConfigMap, env) does **not** by itself purge L1/L2 on other nodes. It only keeps **policy** in sync (Version, TTLs). See [deployment.md — Shared configuration](deployment.md#shared-configuration-across-instances).
 

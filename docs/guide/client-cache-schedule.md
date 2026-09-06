@@ -122,8 +122,9 @@ Changing the schedule too late cannot affect clients that are already holding a 
 
 1. Make the new snapshot available to every application instance.
 2. Change the domain `Version` so new requests use the new generation.
-3. Set the next `ScheduledUpdateUtc`, or clear it if the next date is unknown.
-4. Verify responses, cache diagnostics, and origin load.
+3. If existing Edge URLs must refresh before their TTL expires, call `InvalidateDomainAsync` for the domain with its Edge integration enabled, or use the CDN's purge mechanism. A version change alone does not enqueue an Edge purge.
+4. Set the next `ScheduledUpdateUtc`, or clear it if the next date is unknown.
+5. Verify responses, cache diagnostics, Edge purge outcomes, and origin load.
 
 Keep the old schedule temporarily if you want the domain to remain in Hold during deployment verification. Set the next future schedule when it is safe to resume the long client TTL.
 
@@ -165,6 +166,8 @@ See [Observability](../reference/observability.md) for the full header and metri
 
 If no reliable date exists, omit `ScheduledUpdateUtc`. Clients receive the constant `TtlSeconds`, and server freshness continues to use TTL, tag invalidation, or `Version` according to the domain profile.
 
-For an emergency snapshot release, change `Version` to protect new server requests and purge any CDN through its own control plane if required. Clients already holding a response can remain stale until their current `max-age` ends; a schedule added at emergency time cannot retroactively shorten it.
+For an emergency snapshot release, change `Version` to protect new server requests. If CDN copies must refresh immediately, call `InvalidateDomainAsync` with the domain's [Edge integration](edge.md) enabled to queue a tag purge, or use the CDN's own purge mechanism. Allow for queue/provider latency and inspect purge failures. Browsers already holding a response can remain stale until their current `max-age` ends; a schedule added at emergency time cannot retroactively shorten it.
+
+For applications that need to bypass those browser copies or refresh open views, see [Client cache busting and invalidation](client-invalidation.md) for domain version cache busting and entity synchronization.
 
 Next: learn how to inspect and safely change a running deployment in [Operations](operations.md).

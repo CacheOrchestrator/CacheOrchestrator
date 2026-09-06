@@ -16,12 +16,12 @@
 A request can pass through the following cache layers:
 
 * **Client Cache (CC)** — prevents unnecessary requests from leaving the client.
-* **Edge Cache (EC)** — serves the stored HTTP response from a edge node (a CDN or a reverse proxy) so the request never reaches your server.
+* **Edge Cache (EC)** — serves the stored HTTP response from an edge node (a CDN or a reverse proxy) so the request need not hit your server.
 * **Output Cache (OC)** — serves the stored HTTP response so the server endpoint need not run.
 * **Data Cache (L1/L2)** — serves the stored object so the factory (your database or service) need not run.
 
 
-In real-world applications, caching layers are often fragmented. You might have an in-memory Output Cache on one end, a Redis-backed Data Cache on the other, and optionally an Edge Cache—each operating with different TTLs. When these isolated layers aren't synchronized, they easily work against each other. CacheOrchestrator unifies them under a single domain model to coordinate their lifecycles and policies. This is especially critical for cache invalidation: clearing the Data Cache is pointless if the Output Cache or Edge Cache continues serving stale HTTP responses. By tying these layers together, CacheOrchestrator ensures that all corresponding server-side representations are invalidated simultaneously, with optional hooks to seamlessly push invalidation tags to your external edge infrastructure.
+In real-world applications, caching layers are often fragmented. You might have an in-memory Output Cache on one end, a Redis-backed Data Cache on the other, and optionally an Edge Cache—each operating with different TTLs. When these isolated layers aren't synchronized, they easily work against each other. CacheOrchestrator unifies them under a single domain model to coordinate their lifecycles and policies. This is especially critical for cache invalidation: clearing the Data Cache is pointless if the Output Cache or Edge Cache continues serving stale HTTP responses. CacheOrchestrator applies the same logical invalidation to Output Cache and Data Cache and, when the optional Edge integration is configured, queues a provider-specific tag purge. Edge delivery is asynchronous and best-effort; responses already cached by browsers remain subject to their client cache policy.
 
 ---
 

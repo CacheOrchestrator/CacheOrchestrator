@@ -49,13 +49,16 @@ Each layer stores something different:
 
 | Layer | Stores | Controlled by |
 |-------|--------|---------------|
-| **Client Cache** | The HTTP response in a browser or CDN | `ClientCache` headers and TTL |
+| **Client Cache** | The HTTP response in a browser; shared caches can also honor its headers | `ClientCache` headers and TTL |
+| **Edge Cache (optional)** | The HTTP response in a configured CDN or reverse proxy | `Edge` freshness metadata and queued provider-specific tag invalidation |
 | **Output Cache** | The complete HTTP response in ASP.NET Core | `OutputCache` policy and TTL |
 | **Data Cache** | The object returned by your factory | `DataCache` policy and the selected provider |
 
 An Output Cache hit is the shortest server path: the endpoint and Data Cache are not consulted. A Data Cache hit matters after Output Cache misses or is disabled: the endpoint runs, but the database or remote service does not.
 
-Client Cache is different from the server-side layers. Once a browser or CDN has stored a public response, server-side invalidation cannot recall that copy. The client observes the change when its `max-age` ends or when its own cache is purged. This is why dynamic APIs usually use a shorter client TTL than immutable or scheduled datasets.
+Once a browser has stored a public response, server-side invalidation cannot recall that copy. It can be reused until its `max-age` ends unless the application bypasses it. This is why dynamic APIs usually use a shorter client TTL than immutable or scheduled datasets.
+
+CDN copies can be invalidated through the optional [Edge integration](edge.md). Domain/entity invalidations queue provider-specific tag purges after local invalidation; delivery is asynchronous and best-effort. Without that integration, the CDN follows its own freshness policy and purge mechanism. Purging Edge entries does not purge browser copies.
 
 ## One request uses one resolved snapshot
 

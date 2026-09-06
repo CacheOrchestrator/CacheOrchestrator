@@ -143,7 +143,7 @@ Keep the domain `Version` stable for ordinary writes. Give each detail endpoint 
 
 The server entries may live longer because the write path removes them immediately. Their TTLs remain a safety bound if an invalidation is missed.
 
-The 30-second public client TTL is a product decision, not a server invalidation guarantee. A browser or CDN may serve the old response for those 30 seconds after a write. Use a shorter TTL, `Private`, or `NoStore` when clients must observe changes sooner.
+The 30-second public client TTL is a product decision, not a server invalidation guarantee. A browser may serve the old response for those 30 seconds after a write. Use a shorter TTL or `NoStore` when browsers must observe changes sooner; `Private` prevents shared caching but still permits browser caching. A configured [Edge integration](edge.md) queues tag purges for CDN copies independently of the browser TTL. Until purge completes, or if it fails, the Edge cache follows its own freshness policy.
 
 ### Declare identity on the read
 
