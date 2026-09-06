@@ -1,3 +1,4 @@
+using CacheOrchestrator.Admin;
 using CacheOrchestrator.Edge.Configuration;
 using CacheOrchestrator.Edge.Invalidation;
 using CacheOrchestrator.Edge.Providers;
@@ -7,6 +8,8 @@ using CacheOrchestrator.Configuration;
 using CacheOrchestrator.Invalidation;
 using CacheOrchestrator.OutputCache;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -155,29 +158,172 @@ public class EdgeIntegrationTests
         queue.Jobs.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task VersionChangeObserver_EdgeEnabled_EnqueuesProjectedDomainTag()
+    {
+        TestProvider provider = new();
+        (EdgeDomainChangeMonitor sut, RecordingQueue queue) = CreateVersionObserver(provider, enabled: true);
+
+        await sut.OnDomainVersionChangedAsync("catalog", "v2", TestContext.Current.CancellationToken);
+
+        queue.Jobs.Should().ContainSingle();
+        queue.Jobs[0].Tags.Should().Equal(
+            new EdgeTagProjector().Project("test", CacheTags.Domain("catalog")));
+    }
+
+    [Fact]
+    public async Task VersionChangeObserver_EdgeDisabled_DoesNotEnqueue()
+    {
+        TestProvider provider = new();
+        (EdgeDomainChangeMonitor sut, RecordingQueue queue) = CreateVersionObserver(provider, enabled: false);
+
+        await sut.OnDomainVersionChangedAsync("catalog", "v2", TestContext.Current.CancellationToken);
+
+        queue.Jobs.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ConfigurationChange_VersionChanged_EnqueuesCurrentPlacement()
+    {
+        TestProvider provider = new();
+        (EdgeDomainChangeMonitor sut, RecordingQueue queue) = CreateVersionObserver(provider, enabled: true);
+
+        await sut.ApplyChangesAsync(
+            Snapshot(State(version: "v1")),
+            Snapshot(State(version: "v2")),
+            TestContext.Current.CancellationToken);
+
+        queue.Jobs.Should().ContainSingle();
+        queue.Jobs[0].Tags.Should().Equal(
+            new EdgeTagProjector().Project("new-ns", CacheTags.Domain("catalog")));
+    }
+
+    [Fact]
+    public async Task ConfigurationChange_EdgeDisabled_EnqueuesPreviousPlacement()
+    {
+        TestProvider provider = new();
+        (EdgeDomainChangeMonitor sut, RecordingQueue queue) = CreateVersionObserver(provider, enabled: true);
+
+        await sut.ApplyChangesAsync(
+            Snapshot(State(version: "v1", tagNamespace: "old-ns")),
+            Snapshot(State(version: "v1", enabled: false)),
+            TestContext.Current.CancellationToken);
+
+        queue.Jobs.Should().ContainSingle();
+        queue.Jobs[0].Tags.Should().Equal(
+            new EdgeTagProjector().Project("old-ns", CacheTags.Domain("catalog")));
+    }
+
+    [Fact]
+    public async Task ConfigurationChange_PlacementAndVersionChanged_QueuesOldAndNewPlacement()
+    {
+        TestProvider provider = new();
+        (EdgeDomainChangeMonitor sut, RecordingQueue queue) = CreateVersionObserver(provider, enabled: true);
+
+        await sut.ApplyChangesAsync(
+            Snapshot(State(version: "v1", instanceName: "old", tagNamespace: "old-ns")),
+            Snapshot(State(version: "v2", instanceName: "new", tagNamespace: "new-ns")),
+            TestContext.Current.CancellationToken);
+
+        queue.Jobs.Should().HaveCount(2);
+        queue.Jobs.Select(job => job.InstanceName).Should().Equal("old", "new");
+    }
+
+    [Fact]
+    public async Task ConfigurationChange_VersionChangedWhileEdgeDisabled_DoesNotEnqueue()
+    {
+        TestProvider provider = new();
+        (EdgeDomainChangeMonitor sut, RecordingQueue queue) = CreateVersionObserver(provider, enabled: true);
+
+        await sut.ApplyChangesAsync(
+            Snapshot(State(version: "v1", enabled: false)),
+            Snapshot(State(version: "v2", enabled: false)),
+            TestContext.Current.CancellationToken);
+
+        queue.Jobs.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ConfigurationChange_ConfigVersionChangedUnderRuntimeOverride_DoesNotEnqueue()
+    {
+        TestProvider provider = new();
+        (EdgeDomainChangeMonitor sut, RecordingQueue queue) = CreateVersionObserver(provider, enabled: true);
+        EdgeDomainSnapshot previous = State(version: "v1");
+        EdgeDomainSnapshot current = State(version: "runtime-v2") with { VersionIsRuntimeOverride = true };
+
+        await sut.ApplyChangesAsync(
+            Snapshot(previous),
+            Snapshot(current),
+            TestContext.Current.CancellationToken);
+
+        queue.Jobs.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task PurgeOnStartup_EnqueuesOnlyEnabledOptedInDomains()
+    {
+        TestProvider provider = new();
+        (EdgeDomainChangeMonitor sut, RecordingQueue queue) = CreateVersionObserver(provider, enabled: true);
+        var snapshot = new Dictionary<string, EdgeDomainSnapshot>(StringComparer.Ordinal)
+        {
+            ["catalog"] = State(version: "v1", purgeOnStartup: true),
+            ["disabled"] = State("disabled", "v1", enabled: false, purgeOnStartup: true),
+            ["optout"] = State("optout", "v1")
+        };
+
+        await sut.PurgeOnStartupAsync(snapshot, TestContext.Current.CancellationToken);
+
+        queue.Jobs.Should().ContainSingle();
+    }
+
+    private static (EdgeDomainChangeMonitor Observer, RecordingQueue Queue) CreateVersionObserver(
+        TestProvider provider,
+        bool enabled)
+    {
+        CacheOrchestratorEdgeOptions edgeOptions = CreateEdgeOptions(provider, enabled);
+        IOptionsMonitor<CacheOrchestratorEdgeOptions> edgeMonitor = Substitute.For<IOptionsMonitor<CacheOrchestratorEdgeOptions>>();
+        edgeMonitor.CurrentValue.Returns(edgeOptions);
+        IOptionsMonitor<CacheOrchestratorOptions> coreMonitor = Substitute.For<IOptionsMonitor<CacheOrchestratorOptions>>();
+        coreMonitor.CurrentValue.Returns(new CacheOrchestratorOptions { Namespace = "app" });
+        var instances = new EdgeInstanceResolver(edgeMonitor, coreMonitor, new EdgeProviderCatalog([provider], [provider]));
+        var queue = new RecordingQueue();
+        ServiceProvider services = new ServiceCollection().BuildServiceProvider();
+        return (
+            new EdgeDomainChangeMonitor(
+                new EdgeConfigurationRegistration(new ConfigurationBuilder().Build(), "Cache"),
+                services,
+                new DomainEdgeOptionsProvider(edgeMonitor),
+                instances,
+                new EdgeTagProjector(),
+                queue,
+                NullLogger<EdgeDomainChangeMonitor>.Instance),
+            queue);
+    }
+
+    private static IReadOnlyDictionary<string, EdgeDomainSnapshot> Snapshot(EdgeDomainSnapshot state) =>
+        new Dictionary<string, EdgeDomainSnapshot>(StringComparer.Ordinal) { [state.Domain] = state };
+
+    private static EdgeDomainSnapshot State(
+        string domain = "catalog",
+        string version = "v1",
+        bool enabled = true,
+        bool purgeOnStartup = false,
+        string instanceName = "edge",
+        string tagNamespace = "new-ns") =>
+        new(
+            domain,
+            version,
+            VersionIsRuntimeOverride: false,
+            enabled,
+            purgeOnStartup,
+            instanceName,
+            "Test",
+            tagNamespace);
+
     private static (EdgeResponseContributor Response, EdgeInvalidationObserver Observer, RecordingQueue Queue) Create(
         TestProvider provider)
     {
-        CacheOrchestratorEdgeOptions edgeOptions = new()
-        {
-            EdgeInstances = new Dictionary<string, EdgeInstanceOptions>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["edge"] = new() { Provider = provider.Name, Namespace = "test" }
-            },
-            Domains = new Dictionary<string, EdgeDomainContainer>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["catalog"] = new()
-                {
-                    Edge = new DomainEdgeSettings
-                    {
-                        Enabled = true,
-                        Instance = "edge",
-                        TtlSeconds = 600,
-                        StaleWhileRevalidateSeconds = 30
-                    }
-                }
-            }
-        };
+        CacheOrchestratorEdgeOptions edgeOptions = CreateEdgeOptions(provider, enabled: true);
         IOptionsMonitor<CacheOrchestratorEdgeOptions> edgeMonitor = Substitute.For<IOptionsMonitor<CacheOrchestratorEdgeOptions>>();
         edgeMonitor.CurrentValue.Returns(edgeOptions);
         IOptionsMonitor<CacheOrchestratorOptions> coreMonitor = Substitute.For<IOptionsMonitor<CacheOrchestratorOptions>>();
@@ -192,6 +338,28 @@ public class EdgeIntegrationTests
             new EdgeInvalidationObserver(domainOptions, instances, projector, queue),
             queue);
     }
+
+    private static CacheOrchestratorEdgeOptions CreateEdgeOptions(TestProvider provider, bool enabled) =>
+        new()
+        {
+            EdgeInstances = new Dictionary<string, EdgeInstanceOptions>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["edge"] = new() { Provider = provider.Name, Namespace = "test" }
+            },
+            Domains = new Dictionary<string, EdgeDomainContainer>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["catalog"] = new()
+                {
+                    Edge = new DomainEdgeSettings
+                    {
+                        Enabled = enabled,
+                        Instance = "edge",
+                        TtlSeconds = 600,
+                        StaleWhileRevalidateSeconds = 30
+                    }
+                }
+            }
+        };
 
     private sealed class RecordingQueue : IEdgeInvalidationQueue
     {

@@ -1,3 +1,4 @@
+using CacheOrchestrator.Admin;
 using CacheOrchestrator.Edge.Configuration;
 using CacheOrchestrator.Edge.Invalidation;
 using CacheOrchestrator.Edge.Providers;
@@ -33,6 +34,7 @@ public static class EdgeServiceCollectionExtensions
             return services;
 
         services.AddSingleton<EdgeRegistrationMarker>();
+        services.AddSingleton(new EdgeConfigurationRegistration(configuration, configSection));
         services.AddOptions<CacheOrchestratorEdgeOptions>()
             .Bind(configuration.GetSection(configSection))
             .ValidateOnStart();
@@ -51,6 +53,11 @@ public static class EdgeServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheResponseContributor, EdgeResponseContributor>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheInvalidationObserver, EdgeInvalidationObserver>());
         services.AddHostedService<EdgeInvalidationWorker>();
+        services.TryAddSingleton<EdgeDomainChangeMonitor>();
+        services.AddSingleton<IDomainVersionChangeObserver>(services =>
+            services.GetRequiredService<EdgeDomainChangeMonitor>());
+        services.AddHostedService<EdgeDomainChangeMonitor>(services =>
+            services.GetRequiredService<EdgeDomainChangeMonitor>());
         return services;
     }
 }

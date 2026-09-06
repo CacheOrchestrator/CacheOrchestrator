@@ -41,6 +41,9 @@ public sealed class DomainEdgeSettings
     /// <summary>Whether edge caching and coordinated invalidation are enabled.</summary>
     public bool? Enabled { get; set; }
 
+    /// <summary>Whether the domain tag is purged when the application starts.</summary>
+    public bool? PurgeOnStartup { get; set; }
+
     /// <summary>Name of the edge instance used by this domain.</summary>
     public string? Instance { get; set; }
 

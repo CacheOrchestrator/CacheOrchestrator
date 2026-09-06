@@ -128,6 +128,7 @@ internal sealed class CacheOrchestratorEdgeOptionsValidator : IValidateOptions<C
         return new DomainEdgeSettings
         {
             Enabled = specific?.Enabled ?? defaults?.Enabled,
+            PurgeOnStartup = specific?.PurgeOnStartup ?? defaults?.PurgeOnStartup,
             Instance = specific?.Instance ?? defaults?.Instance,
             TtlSeconds = specific?.TtlSeconds ?? defaults?.TtlSeconds,
             StaleWhileRevalidateSeconds = specific?.StaleWhileRevalidateSeconds ?? defaults?.StaleWhileRevalidateSeconds,

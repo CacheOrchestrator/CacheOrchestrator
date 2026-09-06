@@ -16,6 +16,7 @@ public class DomainEdgeOptionsProviderTests
                 Edge = new DomainEdgeSettings
                 {
                     Enabled = true,
+                    PurgeOnStartup = true,
                     Instance = "edge",
                     TtlSeconds = 300,
                     StaleIfErrorSeconds = 60
@@ -32,6 +33,7 @@ public class DomainEdgeOptionsProviderTests
 
         result.Domain.Should().Be("catalog");
         result.Enabled.Should().BeTrue();
+        result.PurgeOnStartup.Should().BeTrue();
         result.InstanceName.Should().Be("edge");
         result.Ttl.Should().Be(TimeSpan.FromSeconds(900));
         result.StaleIfError.Should().Be(TimeSpan.FromSeconds(60));

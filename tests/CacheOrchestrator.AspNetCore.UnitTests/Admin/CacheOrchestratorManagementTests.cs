@@ -106,12 +106,30 @@ public sealed class CacheOrchestratorManagementTests
         result.ClusterPublish.Failures.Single().PeerId.Should().Be("peer-2");
     }
 
+    [Fact]
+    public async Task SetVersionAsync_NotifiesVersionChangeObservers()
+    {
+        IDomainVersionChangeObserver observer = Substitute.For<IDomainVersionChangeObserver>();
+        CacheOrchestratorManagement sut = CreateSut(versionChangeObservers: [observer]);
+
+        await sut.SetVersionAsync(
+            " Catalog ",
+            new AdminVersionRequest { Version = " v2 " },
+            TestContext.Current.CancellationToken);
+
+        await observer.Received(1).OnDomainVersionChangedAsync(
+            "catalog",
+            "v2",
+            Arg.Any<CancellationToken>());
+    }
+
     private static CacheOrchestratorManagement CreateSut(
         IAdminStatsCollector? stats = null,
         IEnumerable<ICacheOrchestratorHealthProbe>? probes = null,
         IClusterCommandBus? bus = null,
         IDomainRuntimeOverrideStore? overrides = null,
-        IAdminDomainConfigProvider? domainConfig = null)
+        IAdminDomainConfigProvider? domainConfig = null,
+        IEnumerable<IDomainVersionChangeObserver>? versionChangeObservers = null)
     {
         if (stats is null)
         {
@@ -149,7 +167,8 @@ public sealed class CacheOrchestratorManagementTests
             NullLogger<CacheOrchestratorManagement>.Instance,
             TimeProvider.System,
             probes,
-            dataCacheProvider: CreateDataCacheProvider());
+            dataCacheProvider: CreateDataCacheProvider(),
+            versionChangeObservers: versionChangeObservers);
     }
 
     private static IDataCacheProvider CreateDataCacheProvider()

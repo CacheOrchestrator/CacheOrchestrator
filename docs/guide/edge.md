@@ -79,6 +79,7 @@ The Edge call is a sibling registration so the existing meta package does not ac
       "catalog": {
         "Edge": {
           "Enabled": true,
+          "PurgeOnStartup": false,
           "TtlSeconds": 600
         }
       }
@@ -112,9 +113,15 @@ CacheOrchestrator stores internal staged footprint metadata with an Output Cache
 
 All existing invalidation entry points continue to be authoritative. After local invalidation, the edge observer projects the same canonical tags and enqueues them. A bounded background worker coalesces duplicates, respects the provider batch limit, and retries transient errors and rate limits with exponential backoff, jitter, and `Retry-After`.
 
-With `CacheOrchestrator.HttpBus`, only the process that initiated the logical invalidation queues the external call. Peers still apply their local cache invalidation, but remote application is marked and does not duplicate provider calls. Local-only Admin invalidation still invalidates the edge cache.
+With `CacheOrchestrator.HttpBus`, only the process that initiated a runtime Version change or logical invalidation queues the external call. Peers still apply their local mutation, but remote application does not duplicate provider calls. Local-only Admin invalidation still invalidates the edge cache.
 
-Changing the domain `Version` alone does not enqueue a purge; use an explicit domain invalidation when existing Edge URLs must be retired. `CacheInvalidationResult.Succeeded` reports local Data Cache/Output Cache success, not successful Edge queueing or provider completion. Inspect Edge metrics and logs for those outcomes. Edge invalidation does not remove responses already cached by browsers.
+Changing a domain `Version` through the Management/Admin API or configuration reload automatically enqueues a domain-tag purge when Edge is enabled for that domain. Configuration comparison is sequential and runs outside the request path. Each process observes its own configuration reload and may therefore enqueue the same idempotent purge in a multi-instance deployment.
+
+When configuration changes Edge from enabled to disabled, removes the domain, or changes its instance, provider, or tag namespace, CacheOrchestrator purges the previous Edge placement. A simultaneous Version and placement change purges both the old placement and the new enabled placement. Edge-disabled domains do not purge for Version-only changes.
+
+`PurgeOnStartup` defaults to `false`. When enabled for an Edge-enabled, explicitly configured domain, the host enqueues its domain purge on every startup. This covers Version changes made while an instance was stopped, but every starting replica may enqueue the same idempotent purge. Use it deliberately in large rolling deployments to avoid unnecessary provider traffic. Dynamic domains that are not present in `Cache:Domains` or the Edge domain configuration cannot be enumerated at startup.
+
+`CacheInvalidationResult.Succeeded` reports local Data Cache/Output Cache success, not successful Edge queueing or provider completion. Inspect Edge metrics and logs for those outcomes. Edge invalidation does not remove responses already cached by browsers.
 
 The built-in queue is in-memory and best-effort. It drains within the host's graceful shutdown deadline, but a process crash can lose queued work. Invalidations are idempotent. Applications requiring crash-safe delivery can register their own `IEdgeInvalidationQueue` before `AddCacheOrchestratorEdge` and persist `EdgeInvalidationJob` records in an outbox. Because the replacement contract is enqueue-only, that application also owns the durable outbox dispatcher; the built-in worker drains only its built-in channel.
 
@@ -359,7 +366,7 @@ sub vcl_deliver {
 
 ## Integration test
 
-The integration suite starts the pinned official `varnish:9.0.3-5` image with the `xkey` VMOD and an nginx origin. `VarnishEdgeDockerTests` verifies the complete `MISS` → `HIT` → tag `PURGE` → `MISS` flow through the public `IEdgeInvalidationProvider`, and verifies that origin-only edge headers do not reach the client. Docker must be running; execute:
+The integration suite starts the pinned official `varnish:9.0.3-5` image with the `xkey` VMOD and an nginx origin. `VarnishEdgeDockerTests` verifies both direct provider invalidation and the complete `MISS` → `HIT` → runtime Version change → automatic tag `PURGE` → `MISS` flow, and verifies that origin-only edge headers do not reach the client. Docker must be running; execute:
 
 ```bash
 dotnet test tests/CacheOrchestrator.IntegrationTests/CacheOrchestrator.IntegrationTests.csproj \

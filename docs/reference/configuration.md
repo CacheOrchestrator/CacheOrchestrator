@@ -134,6 +134,7 @@ services.AddCacheOrchestratorEdge(configuration, edge =>
 | Property | Default | Description |
 |----------|---------|-------------|
 | `Enabled` | `false` | Emit provider metadata and coordinate purge for this domain |
+| `PurgeOnStartup` | `false` | Enqueue a domain-tag purge on host startup when Edge is enabled |
 | `Instance` | empty | Named `EdgeInstances` entry; required when enabled |
 | `TtlSeconds` | `300` | Edge-only fresh lifetime |
 | `StaleWhileRevalidateSeconds` | null | Optional edge stale/revalidation window |
