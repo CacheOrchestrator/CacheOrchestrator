@@ -1,1 +1,11 @@
 #nullable enable
+CacheOrchestrator.Edge.Varnish.VarnishEdgeBuilderExtensions
+CacheOrchestrator.Edge.Varnish.VarnishEdgeInstanceOptions
+CacheOrchestrator.Edge.Varnish.VarnishEdgeInstanceOptions.ApiKey.get -> string?
+CacheOrchestrator.Edge.Varnish.VarnishEdgeInstanceOptions.ApiKey.set -> void
+CacheOrchestrator.Edge.Varnish.VarnishEdgeInstanceOptions.ApiKeyHeaderName.get -> string!
+CacheOrchestrator.Edge.Varnish.VarnishEdgeInstanceOptions.ApiKeyHeaderName.set -> void
+CacheOrchestrator.Edge.Varnish.VarnishEdgeInstanceOptions.PurgeUrl.get -> string?
+CacheOrchestrator.Edge.Varnish.VarnishEdgeInstanceOptions.PurgeUrl.set -> void
+CacheOrchestrator.Edge.Varnish.VarnishEdgeInstanceOptions.VarnishEdgeInstanceOptions() -> void
+static CacheOrchestrator.Edge.Varnish.VarnishEdgeBuilderExtensions.AddVarnish(this CacheOrchestrator.Edge.DependencyInjection.ICacheOrchestratorEdgeBuilder! builder) -> CacheOrchestrator.Edge.DependencyInjection.ICacheOrchestratorEdgeBuilder!

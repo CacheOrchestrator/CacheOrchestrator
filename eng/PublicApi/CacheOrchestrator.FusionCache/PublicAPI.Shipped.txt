@@ -16,24 +16,22 @@ CacheOrchestrator.FusionCache.Backends.IFusionCacheBackendRegistrar.Name.get -> 
 CacheOrchestrator.FusionCache.Backends.IFusionCacheBackendRegistrar.RegisterFusionCache(CacheOrchestrator.FusionCache.Backends.FusionCacheRegistrationContext! context) -> void
 CacheOrchestrator.FusionCache.DomainFusionCacheSettings
 CacheOrchestrator.FusionCache.DomainFusionCacheSettings.AllowBackgroundBackplane.get -> bool?
-CacheOrchestrator.FusionCache.DomainFusionCacheSettings.AllowBackgroundBackplane.set -> void
+CacheOrchestrator.FusionCache.DomainFusionCacheSettings.AllowBackgroundBackplane.init -> void
 CacheOrchestrator.FusionCache.DomainFusionCacheSettings.AllowBackgroundDistributed.get -> bool?
-CacheOrchestrator.FusionCache.DomainFusionCacheSettings.AllowBackgroundDistributed.set -> void
+CacheOrchestrator.FusionCache.DomainFusionCacheSettings.AllowBackgroundDistributed.init -> void
 CacheOrchestrator.FusionCache.DomainFusionCacheSettings.DomainFusionCacheSettings() -> void
 CacheOrchestrator.FusionCache.DomainFusionCacheSettings.EagerRefreshRatio.get -> double?
-CacheOrchestrator.FusionCache.DomainFusionCacheSettings.EagerRefreshRatio.set -> void
+CacheOrchestrator.FusionCache.DomainFusionCacheSettings.EagerRefreshRatio.init -> void
 CacheOrchestrator.FusionCache.DomainFusionCacheSettings.FactoryHardTimeoutSeconds.get -> int?
-CacheOrchestrator.FusionCache.DomainFusionCacheSettings.FactoryHardTimeoutSeconds.set -> void
+CacheOrchestrator.FusionCache.DomainFusionCacheSettings.FactoryHardTimeoutSeconds.init -> void
 CacheOrchestrator.FusionCache.DomainFusionCacheSettings.FactorySoftTimeoutSeconds.get -> int?
-CacheOrchestrator.FusionCache.DomainFusionCacheSettings.FactorySoftTimeoutSeconds.set -> void
+CacheOrchestrator.FusionCache.DomainFusionCacheSettings.FactorySoftTimeoutSeconds.init -> void
 CacheOrchestrator.FusionCache.DomainFusionCacheSettings.FailSafeSeconds.get -> int?
-CacheOrchestrator.FusionCache.DomainFusionCacheSettings.FailSafeSeconds.set -> void
+CacheOrchestrator.FusionCache.DomainFusionCacheSettings.FailSafeSeconds.init -> void
 CacheOrchestrator.FusionCache.DomainFusionCacheSettings.HardTtlSeconds.get -> int?
-CacheOrchestrator.FusionCache.DomainFusionCacheSettings.HardTtlSeconds.set -> void
+CacheOrchestrator.FusionCache.DomainFusionCacheSettings.HardTtlSeconds.init -> void
 CacheOrchestrator.FusionCache.DomainFusionCacheSettings.JitterSeconds.get -> int?
-CacheOrchestrator.FusionCache.DomainFusionCacheSettings.JitterSeconds.set -> void
-CacheOrchestrator.FusionCache.DomainFusionCacheSettings.MaxItemBytes.get -> int?
-CacheOrchestrator.FusionCache.DomainFusionCacheSettings.MaxItemBytes.set -> void
+CacheOrchestrator.FusionCache.DomainFusionCacheSettings.JitterSeconds.init -> void
 CacheOrchestrator.FusionCache.FusionDomainRuntimeOverride
 CacheOrchestrator.FusionCache.FusionDomainRuntimeOverride.AllowBackgroundBackplane.get -> bool?
 CacheOrchestrator.FusionCache.FusionDomainRuntimeOverride.AllowBackgroundBackplane.init -> void
@@ -53,8 +51,6 @@ CacheOrchestrator.FusionCache.FusionDomainRuntimeOverride.HardTtl.init -> void
 CacheOrchestrator.FusionCache.FusionDomainRuntimeOverride.HasAny.get -> bool
 CacheOrchestrator.FusionCache.FusionDomainRuntimeOverride.Jitter.get -> System.TimeSpan?
 CacheOrchestrator.FusionCache.FusionDomainRuntimeOverride.Jitter.init -> void
-CacheOrchestrator.FusionCache.FusionDomainRuntimeOverride.MaxItemBytes.get -> int?
-CacheOrchestrator.FusionCache.FusionDomainRuntimeOverride.MaxItemBytes.init -> void
 CacheOrchestrator.FusionCache.FusionDomainRuntimeOverride.Stamp.get -> int
 CacheOrchestrator.FusionCache.FusionDomainRuntimeOverride.Stamp.init -> void
 CacheOrchestrator.FusionCache.FusionDomainSettingsPatch
@@ -76,8 +72,6 @@ CacheOrchestrator.FusionCache.FusionDomainSettingsPatch.HardTtl.init -> void
 CacheOrchestrator.FusionCache.FusionDomainSettingsPatch.HasAny.get -> bool
 CacheOrchestrator.FusionCache.FusionDomainSettingsPatch.Jitter.get -> System.TimeSpan?
 CacheOrchestrator.FusionCache.FusionDomainSettingsPatch.Jitter.init -> void
-CacheOrchestrator.FusionCache.FusionDomainSettingsPatch.MaxItemBytes.get -> int?
-CacheOrchestrator.FusionCache.FusionDomainSettingsPatch.MaxItemBytes.init -> void
 CacheOrchestrator.FusionCache.IFusionDomainRuntimeOverrideStore
 CacheOrchestrator.FusionCache.IFusionDomainRuntimeOverrideStore.Clear(string! domain) -> bool
 CacheOrchestrator.FusionCache.IFusionDomainRuntimeOverrideStore.Get(string! domain) -> CacheOrchestrator.FusionCache.FusionDomainRuntimeOverride?

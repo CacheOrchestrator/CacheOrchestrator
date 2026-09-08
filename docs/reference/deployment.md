@@ -238,9 +238,9 @@ This means two domains can safely map to **different Redis clusters** (e.g. GDPR
 
 Cache settings that affect **shared** cache behaviour must be the **same** on every app instance that uses the same Output Cache store and/or Fusion L2/backplane. That includes at least:
 
-- `Cache:Namespace` and per-instance Fusion namespaces  
+- `Cache:Namespace` and explicit Output Cache, Data Cache instance and Edge namespaces  
 - `Domains:*:Version` (generation stamp / key space)  
-- Domain TTLs, Client Cache Schedule, `FusionCacheInstance` mapping  
+- Domain TTLs, Client Cache Schedule, `DataCache.Instance` mapping into `DataCacheInstances`  
 - Redis connection targets (when using Redis)
 
 Hand-editing a different `appsettings.json` on each machine causes **desynchronization** (different Version → different keys; different TTLs → inconsistent behaviour). This is a general multi-instance configuration problem, not specific to CacheOrchestrator.

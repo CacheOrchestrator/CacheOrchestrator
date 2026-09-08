@@ -1,5 +1,4 @@
 #nullable enable
-abstract CacheOrchestrator.Cluster.ClusterCommand.<Clone>$() -> CacheOrchestrator.Cluster.ClusterCommand!
 CacheOrchestrator.Admin.AdminClusterInfoDto
 CacheOrchestrator.Admin.AdminClusterInfoDto.AdminClusterInfoDto() -> void
 CacheOrchestrator.Admin.AdminClusterInfoDto.BusEnabled.get -> bool
@@ -39,10 +38,10 @@ CacheOrchestrator.Admin.AdminDomainConfigDto.OutputCacheTtlSeconds.get -> int
 CacheOrchestrator.Admin.AdminDomainConfigDto.OutputCacheTtlSeconds.init -> void
 CacheOrchestrator.Admin.AdminDomainConfigDto.RuntimeOverrides.get -> CacheOrchestrator.Admin.AdminRuntimeOverrideFlagsDto?
 CacheOrchestrator.Admin.AdminDomainConfigDto.RuntimeOverrides.init -> void
-CacheOrchestrator.Admin.AdminDomainConfigDto.ScheduledUpdateUtc.get -> System.DateTimeOffset?
-CacheOrchestrator.Admin.AdminDomainConfigDto.ScheduledUpdateUtc.init -> void
 CacheOrchestrator.Admin.AdminDomainConfigDto.SchedulePhase.get -> string?
 CacheOrchestrator.Admin.AdminDomainConfigDto.SchedulePhase.init -> void
+CacheOrchestrator.Admin.AdminDomainConfigDto.ScheduledUpdateUtc.get -> System.DateTimeOffset?
+CacheOrchestrator.Admin.AdminDomainConfigDto.ScheduledUpdateUtc.init -> void
 CacheOrchestrator.Admin.AdminDomainConfigDto.Version.get -> string!
 CacheOrchestrator.Admin.AdminDomainConfigDto.Version.init -> void
 CacheOrchestrator.Admin.AdminDomainConfigDto.VersionIsRuntimeOverride.get -> bool
@@ -101,6 +100,8 @@ CacheOrchestrator.Admin.AdminDomainMutationResultDto.Domain.get -> string!
 CacheOrchestrator.Admin.AdminDomainMutationResultDto.Domain.init -> void
 CacheOrchestrator.Admin.AdminDomainMutationResultDto.Effective.get -> CacheOrchestrator.Admin.AdminDomainConfigDto!
 CacheOrchestrator.Admin.AdminDomainMutationResultDto.Effective.init -> void
+CacheOrchestrator.Admin.AdminDomainMutationResultDto.LocalInvalidationErrors.get -> System.Collections.Generic.IReadOnlyList<string!>!
+CacheOrchestrator.Admin.AdminDomainMutationResultDto.LocalInvalidationErrors.init -> void
 CacheOrchestrator.Admin.AdminDomainSettingsCatalogDto
 CacheOrchestrator.Admin.AdminDomainSettingsCatalogDto.AdminDomainSettingsCatalogDto() -> void
 CacheOrchestrator.Admin.AdminDomainSettingsCatalogDto.Settings.get -> System.Collections.Generic.IReadOnlyList<CacheOrchestrator.Configuration.DomainSettingCatalogEntry!>!
@@ -153,10 +154,26 @@ CacheOrchestrator.Admin.AdminEndpointInfoDto.Pattern.get -> string!
 CacheOrchestrator.Admin.AdminEndpointInfoDto.Pattern.init -> void
 CacheOrchestrator.Admin.AdminEndpointInfoDto.Route.get -> string!
 CacheOrchestrator.Admin.AdminEndpointInfoDto.Route.init -> void
+CacheOrchestrator.Admin.AdminFactoryRecord
+CacheOrchestrator.Admin.AdminFactoryRecord.AdminFactoryRecord() -> void
+CacheOrchestrator.Admin.AdminFactoryRecord.Domain.get -> string?
+CacheOrchestrator.Admin.AdminFactoryRecord.Domain.init -> void
+CacheOrchestrator.Admin.AdminFactoryRecord.ElapsedTicks.get -> long?
+CacheOrchestrator.Admin.AdminFactoryRecord.ElapsedTicks.init -> void
+CacheOrchestrator.Admin.AdminFactoryRecord.EndpointKey.get -> string?
+CacheOrchestrator.Admin.AdminFactoryRecord.EndpointKey.init -> void
+CacheOrchestrator.Admin.AdminFactoryRecord.Failed.get -> bool
+CacheOrchestrator.Admin.AdminFactoryRecord.Failed.init -> void
+CacheOrchestrator.Admin.AdminFactoryRecord.ResultSizeBytes.get -> long?
+CacheOrchestrator.Admin.AdminFactoryRecord.ResultSizeBytes.init -> void
 CacheOrchestrator.Admin.AdminHealthDto
 CacheOrchestrator.Admin.AdminHealthDto.AdminEnabled.get -> bool
 CacheOrchestrator.Admin.AdminHealthDto.AdminEnabled.init -> void
 CacheOrchestrator.Admin.AdminHealthDto.AdminHealthDto() -> void
+CacheOrchestrator.Admin.AdminHealthDto.DataCacheCapabilities.get -> CacheOrchestrator.Orchestration.DataCacheProviderCapabilities!
+CacheOrchestrator.Admin.AdminHealthDto.DataCacheCapabilities.init -> void
+CacheOrchestrator.Admin.AdminHealthDto.DataCacheProvider.get -> string!
+CacheOrchestrator.Admin.AdminHealthDto.DataCacheProvider.init -> void
 CacheOrchestrator.Admin.AdminHealthDto.Healthy.get -> bool
 CacheOrchestrator.Admin.AdminHealthDto.Healthy.init -> void
 CacheOrchestrator.Admin.AdminHealthDto.InstanceId.get -> string!
@@ -209,6 +226,8 @@ CacheOrchestrator.Admin.AdminRuntimeOverrideFlagsDto.Version.get -> bool
 CacheOrchestrator.Admin.AdminRuntimeOverrideFlagsDto.Version.init -> void
 CacheOrchestrator.Admin.AdminSettingsPatchRequest
 CacheOrchestrator.Admin.AdminSettingsPatchRequest.AdminSettingsPatchRequest() -> void
+CacheOrchestrator.Admin.AdminSettingsPatchRequest.ApplyImmediately.get -> bool
+CacheOrchestrator.Admin.AdminSettingsPatchRequest.ApplyImmediately.set -> void
 CacheOrchestrator.Admin.AdminSettingsPatchRequest.Distribute.get -> bool
 CacheOrchestrator.Admin.AdminSettingsPatchRequest.Distribute.set -> void
 CacheOrchestrator.Admin.AdminSettingsPatchRequest.Settings.get -> System.Collections.Generic.Dictionary<string!, System.Text.Json.JsonElement>?
@@ -237,6 +256,12 @@ CacheOrchestrator.Admin.DomainSettingsPatch.DataCacheTtl.get -> System.TimeSpan?
 CacheOrchestrator.Admin.DomainSettingsPatch.DataCacheTtl.init -> void
 CacheOrchestrator.Admin.DomainSettingsPatch.DomainSettingsPatch() -> void
 CacheOrchestrator.Admin.DomainSettingsPatch.HasAny.get -> bool
+CacheOrchestrator.Admin.DomainSettingsPatchContext
+CacheOrchestrator.Admin.DomainSettingsPatchContext.Domain.get -> string!
+CacheOrchestrator.Admin.DomainSettingsPatchContext.Get<T>() -> T?
+CacheOrchestrator.Admin.DomainSettingsPatchContext.Remove<T>() -> bool
+CacheOrchestrator.Admin.DomainSettingsPatchContext.Set<T>(T! settings) -> void
+CacheOrchestrator.Admin.DomainSettingsPatchContext.Stamp.get -> int
 CacheOrchestrator.Admin.IAdminDomainConfigProvider
 CacheOrchestrator.Admin.IAdminDomainConfigProvider.GetDomainConfig(string! normalizedDomain) -> CacheOrchestrator.Admin.AdminDomainConfigDto!
 CacheOrchestrator.Admin.IAdminEndpointCatalog
@@ -245,6 +270,7 @@ CacheOrchestrator.Admin.IAdminStatsCollector
 CacheOrchestrator.Admin.IAdminStatsCollector.GetRawSnapshot() -> CacheOrchestrator.Admin.AdminLiveStatsRawSnapshot!
 CacheOrchestrator.Admin.IAdminStatsCollector.IsEnabled.get -> bool
 CacheOrchestrator.Admin.IAdminStatsCollector.RecordDataCache(string? endpointKey, string? domain, string! result, long? elapsedTicks = null, long? resultSizeBytes = null) -> void
+CacheOrchestrator.Admin.IAdminStatsCollector.RecordFactory(CacheOrchestrator.Admin.AdminFactoryRecord! record) -> void
 CacheOrchestrator.Admin.IAdminStatsCollector.RecordInvalidation(string! domain) -> void
 CacheOrchestrator.Admin.IAdminStatsCollector.RecordOutput(string? endpointKey, string? domain, string! result) -> void
 CacheOrchestrator.Admin.IAdminStatsCollector.TrackEndpoints.get -> bool
@@ -253,8 +279,8 @@ CacheOrchestrator.Admin.IAdminStatsCollector.TrackResultSize.get -> bool
 CacheOrchestrator.Admin.ICacheOrchestratorManagement
 CacheOrchestrator.Admin.ICacheOrchestratorManagement.GetClusterInfoAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<CacheOrchestrator.Admin.AdminClusterInfoDto!>!
 CacheOrchestrator.Admin.ICacheOrchestratorManagement.GetDomain(string! domain) -> CacheOrchestrator.Admin.AdminDomainConfigDto?
-CacheOrchestrator.Admin.ICacheOrchestratorManagement.GetDomains() -> System.Collections.Generic.IReadOnlyList<CacheOrchestrator.Admin.AdminDomainConfigDto!>!
 CacheOrchestrator.Admin.ICacheOrchestratorManagement.GetDomainSettingsCatalog() -> CacheOrchestrator.Admin.AdminDomainSettingsCatalogDto!
+CacheOrchestrator.Admin.ICacheOrchestratorManagement.GetDomains() -> System.Collections.Generic.IReadOnlyList<CacheOrchestrator.Admin.AdminDomainConfigDto!>!
 CacheOrchestrator.Admin.ICacheOrchestratorManagement.GetEndpoints() -> System.Collections.Generic.IReadOnlyList<CacheOrchestrator.Admin.AdminEndpointInfoDto!>!
 CacheOrchestrator.Admin.ICacheOrchestratorManagement.GetHealthAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<CacheOrchestrator.Admin.AdminHealthDto!>!
 CacheOrchestrator.Admin.ICacheOrchestratorManagement.GetStats() -> CacheOrchestrator.Admin.AdminLiveStatsRawSnapshot!
@@ -265,12 +291,17 @@ CacheOrchestrator.Admin.IDomainRuntimeOverrideStore
 CacheOrchestrator.Admin.IDomainRuntimeOverrideStore.Clear(string! domain) -> bool
 CacheOrchestrator.Admin.IDomainRuntimeOverrideStore.Get(string! domain) -> CacheOrchestrator.Admin.DomainRuntimeOverride?
 CacheOrchestrator.Admin.IDomainRuntimeOverrideStore.GetOverriddenDomains() -> System.Collections.Generic.IReadOnlyCollection<string!>!
+CacheOrchestrator.Admin.IDomainRuntimeOverrideStore.GetSettings<T>(string! domain) -> T?
 CacheOrchestrator.Admin.IDomainRuntimeOverrideStore.GetStamp(string! domain) -> int
 CacheOrchestrator.Admin.IDomainRuntimeOverrideStore.PatchSettings(string! domain, CacheOrchestrator.Admin.DomainSettingsPatch! patch) -> CacheOrchestrator.Admin.DomainRuntimeOverride!
 CacheOrchestrator.Admin.IDomainRuntimeOverrideStore.SetVersion(string! domain, string! version) -> CacheOrchestrator.Admin.DomainRuntimeOverride!
+CacheOrchestrator.Admin.IDomainRuntimeOverrideStore.Update(string! domain, System.Action<CacheOrchestrator.Admin.DomainSettingsPatchContext!>! prepare) -> void
 CacheOrchestrator.Admin.IDomainSettingsPatchContributor
-CacheOrchestrator.Admin.IDomainSettingsPatchContributor.Apply(string! domain, System.Collections.Generic.IReadOnlyDictionary<string!, System.Text.Json.JsonElement>! settings) -> void
 CacheOrchestrator.Admin.IDomainSettingsPatchContributor.Owns(string! settingId) -> bool
+CacheOrchestrator.Admin.IDomainSettingsPatchContributor.Prepare(CacheOrchestrator.Admin.DomainSettingsPatchContext! context, System.Collections.Generic.IReadOnlyDictionary<string!, System.Text.Json.JsonElement>! settings) -> void
+CacheOrchestrator.Admin.IDomainSettingsPatchContributor.Validate(CacheOrchestrator.Admin.DomainSettingsPatchContext! context) -> void
+CacheOrchestrator.Admin.IDomainVersionChangeObserver
+CacheOrchestrator.Admin.IDomainVersionChangeObserver.OnDomainVersionChangedAsync(string! domain, string! version, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 CacheOrchestrator.Cluster.ClusterCommand
 CacheOrchestrator.Cluster.ClusterCommand.ClusterCommand() -> void
 CacheOrchestrator.Cluster.ClusterCommand.ClusterCommand(CacheOrchestrator.Cluster.ClusterCommand! original) -> void
@@ -284,6 +315,22 @@ CacheOrchestrator.Cluster.ClusterCommand.OriginInstanceId.get -> string!
 CacheOrchestrator.Cluster.ClusterCommand.OriginInstanceId.init -> void
 CacheOrchestrator.Cluster.ClusterCommand.TimestampUtc.get -> System.DateTimeOffset
 CacheOrchestrator.Cluster.ClusterCommand.TimestampUtc.init -> void
+CacheOrchestrator.Cluster.ClusterCommandResult
+CacheOrchestrator.Cluster.ClusterCommandResult.ClusterCommandResult(CacheOrchestrator.Cluster.ClusterCommandStatus status, string? reason = null, bool localMutationApplied = false) -> void
+CacheOrchestrator.Cluster.ClusterCommandResult.Errors.get -> System.Collections.Generic.IReadOnlyList<string!>!
+CacheOrchestrator.Cluster.ClusterCommandResult.Errors.init -> void
+CacheOrchestrator.Cluster.ClusterCommandResult.Invalidation.get -> CacheOrchestrator.Invalidation.CacheInvalidationResult?
+CacheOrchestrator.Cluster.ClusterCommandResult.Invalidation.init -> void
+CacheOrchestrator.Cluster.ClusterCommandResult.LocalMutationApplied.get -> bool
+CacheOrchestrator.Cluster.ClusterCommandResult.Reason.get -> string?
+CacheOrchestrator.Cluster.ClusterCommandResult.Status.get -> CacheOrchestrator.Cluster.ClusterCommandStatus
+CacheOrchestrator.Cluster.ClusterCommandResult.Succeeded.get -> bool
+CacheOrchestrator.Cluster.ClusterCommandStatus
+CacheOrchestrator.Cluster.ClusterCommandStatus.AlreadyApplied = 1 -> CacheOrchestrator.Cluster.ClusterCommandStatus
+CacheOrchestrator.Cluster.ClusterCommandStatus.Applied = 0 -> CacheOrchestrator.Cluster.ClusterCommandStatus
+CacheOrchestrator.Cluster.ClusterCommandStatus.Failed = 4 -> CacheOrchestrator.Cluster.ClusterCommandStatus
+CacheOrchestrator.Cluster.ClusterCommandStatus.Ignored = 2 -> CacheOrchestrator.Cluster.ClusterCommandStatus
+CacheOrchestrator.Cluster.ClusterCommandStatus.Rejected = 3 -> CacheOrchestrator.Cluster.ClusterCommandStatus
 CacheOrchestrator.Cluster.ClusterPeer
 CacheOrchestrator.Cluster.ClusterPeer.<Clone>$() -> CacheOrchestrator.Cluster.ClusterPeer!
 CacheOrchestrator.Cluster.ClusterPeer.BaseUrl.get -> System.Uri!
@@ -310,7 +357,7 @@ CacheOrchestrator.Cluster.IClusterCommandBus
 CacheOrchestrator.Cluster.IClusterCommandBus.IsEnabled.get -> bool
 CacheOrchestrator.Cluster.IClusterCommandBus.PublishAsync(CacheOrchestrator.Cluster.ClusterCommand! command, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<CacheOrchestrator.Cluster.ClusterPublishResult!>!
 CacheOrchestrator.Cluster.IClusterCommandHandler
-CacheOrchestrator.Cluster.IClusterCommandHandler.ApplyLocalAsync(CacheOrchestrator.Cluster.ClusterCommand! command, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+CacheOrchestrator.Cluster.IClusterCommandHandler.ApplyLocalAsync(CacheOrchestrator.Cluster.ClusterCommand! command, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<CacheOrchestrator.Cluster.ClusterCommandResult!>!
 CacheOrchestrator.Cluster.IClusterMembership
 CacheOrchestrator.Cluster.IClusterMembership.GetPeersAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<CacheOrchestrator.Cluster.ClusterPeer!>!>!
 CacheOrchestrator.Cluster.IClusterMembership.Kind.get -> string!
@@ -334,6 +381,8 @@ CacheOrchestrator.Cluster.InvalidateCommand.Scope.init -> void
 CacheOrchestrator.Cluster.InvalidateCommand.Tags.get -> string![]!
 CacheOrchestrator.Cluster.InvalidateCommand.Tags.init -> void
 CacheOrchestrator.Cluster.SettingsPatchCommand
+CacheOrchestrator.Cluster.SettingsPatchCommand.ApplyImmediately.get -> bool
+CacheOrchestrator.Cluster.SettingsPatchCommand.ApplyImmediately.init -> void
 CacheOrchestrator.Cluster.SettingsPatchCommand.Domain.get -> string!
 CacheOrchestrator.Cluster.SettingsPatchCommand.Domain.init -> void
 CacheOrchestrator.Cluster.SettingsPatchCommand.Equals(CacheOrchestrator.Cluster.SettingsPatchCommand? other) -> bool
@@ -433,6 +482,9 @@ CacheOrchestrator.Configuration.DomainSettingAttribute.Kind.init -> void
 CacheOrchestrator.Configuration.DomainSettingAttribute.RuntimeOverlay.get -> bool
 CacheOrchestrator.Configuration.DomainSettingAttribute.RuntimeOverlay.init -> void
 CacheOrchestrator.Configuration.DomainSettingCatalog
+CacheOrchestrator.Configuration.DomainSettingCatalog.Find(string? id) -> CacheOrchestrator.Configuration.DomainSettingCatalogEntry?
+CacheOrchestrator.Configuration.DomainSettingCatalog.GetEntries() -> System.Collections.Generic.IReadOnlyList<CacheOrchestrator.Configuration.DomainSettingCatalogEntry!>!
+CacheOrchestrator.Configuration.DomainSettingCatalog.GetOverlayEntries() -> System.Collections.Generic.IReadOnlyList<CacheOrchestrator.Configuration.DomainSettingCatalogEntry!>!
 CacheOrchestrator.Configuration.DomainSettingCatalogEntry
 CacheOrchestrator.Configuration.DomainSettingCatalogEntry.DisplayName.get -> string!
 CacheOrchestrator.Configuration.DomainSettingCatalogEntry.DisplayName.init -> void
@@ -476,8 +528,8 @@ CacheOrchestrator.Entity.EntityCache
 CacheOrchestrator.Entity.EntityCache<T>
 CacheOrchestrator.Entity.EntityCache<T>.Alias(string! entityKind, string! resourceId) -> CacheOrchestrator.Entity.EntityCache<T>!
 CacheOrchestrator.Entity.EntityCache<T>.Alias<TId>(string! entityKind, TId resourceId) -> CacheOrchestrator.Entity.EntityCache<T>!
-CacheOrchestrator.Entity.EntityCache<T>.DependsOn(string! entityKind, string! resourceId) -> CacheOrchestrator.Entity.EntityCache<T>!
 CacheOrchestrator.Entity.EntityCache<T>.DependsOn(string! entityKind, System.Collections.Generic.IEnumerable<string!>! resourceIds) -> CacheOrchestrator.Entity.EntityCache<T>!
+CacheOrchestrator.Entity.EntityCache<T>.DependsOn(string! entityKind, string! resourceId) -> CacheOrchestrator.Entity.EntityCache<T>!
 CacheOrchestrator.Entity.EntityCache<T>.DependsOn<TId>(string! entityKind, System.Collections.Generic.IEnumerable<TId>! resourceIds) -> CacheOrchestrator.Entity.EntityCache<T>!
 CacheOrchestrator.Entity.EntityCache<T>.DependsOn<TId>(string! entityKind, TId resourceId) -> CacheOrchestrator.Entity.EntityCache<T>!
 CacheOrchestrator.Entity.EntityCache<T>.Footprint.get -> CacheOrchestrator.Entity.EntityFootprint!
@@ -512,14 +564,16 @@ CacheOrchestrator.Entity.EntitySet<T>
 CacheOrchestrator.Entity.EntitySet<T>.Alias(string! entityKind, string! resourceId) -> CacheOrchestrator.Entity.EntitySet<T>!
 CacheOrchestrator.Entity.EntitySet<T>.Alias<TId>(string! entityKind, TId resourceId) -> CacheOrchestrator.Entity.EntitySet<T>!
 CacheOrchestrator.Entity.EntitySet<T>.BuildFootprint(string? defaultMemberKind) -> CacheOrchestrator.Entity.EntityFootprint!
-CacheOrchestrator.Entity.EntitySet<T>.DependsOn(string! entityKind, string! resourceId) -> CacheOrchestrator.Entity.EntitySet<T>!
 CacheOrchestrator.Entity.EntitySet<T>.DependsOn(System.Func<T, string!>! kindSelector, System.Func<T, string!>! idSelector) -> CacheOrchestrator.Entity.EntitySet<T>!
-CacheOrchestrator.Entity.EntitySet<T>.DependsOn<TId>(string! entityKind, TId resourceId) -> CacheOrchestrator.Entity.EntitySet<T>!
+CacheOrchestrator.Entity.EntitySet<T>.DependsOn(string! entityKind, string! resourceId) -> CacheOrchestrator.Entity.EntitySet<T>!
 CacheOrchestrator.Entity.EntitySet<T>.DependsOn<TId>(System.Func<T, string!>! kindSelector, System.Func<T, TId>! idSelector) -> CacheOrchestrator.Entity.EntitySet<T>!
+CacheOrchestrator.Entity.EntitySet<T>.DependsOn<TId>(string! entityKind, TId resourceId) -> CacheOrchestrator.Entity.EntitySet<T>!
 CacheOrchestrator.Entity.EntitySet<T>.Value.get -> System.Collections.Generic.IReadOnlyList<T>!
 CacheOrchestrator.Invalidation.CacheInvalidationContext
 CacheOrchestrator.Invalidation.CacheInvalidationContext.CacheInvalidationContext(CacheOrchestrator.Invalidation.CacheInvalidationKind kind, string! scope, System.Collections.Generic.IReadOnlyList<string!>! tags) -> void
+CacheOrchestrator.Invalidation.CacheInvalidationContext.CacheInvalidationContext(CacheOrchestrator.Invalidation.CacheInvalidationKind kind, string! scope, System.Collections.Generic.IReadOnlyList<string!>! tags, CacheOrchestrator.Invalidation.CacheInvalidationOrigin origin) -> void
 CacheOrchestrator.Invalidation.CacheInvalidationContext.Kind.get -> CacheOrchestrator.Invalidation.CacheInvalidationKind
+CacheOrchestrator.Invalidation.CacheInvalidationContext.Origin.get -> CacheOrchestrator.Invalidation.CacheInvalidationOrigin
 CacheOrchestrator.Invalidation.CacheInvalidationContext.Scope.get -> string!
 CacheOrchestrator.Invalidation.CacheInvalidationContext.Tags.get -> System.Collections.Generic.IReadOnlyList<string!>!
 CacheOrchestrator.Invalidation.CacheInvalidationKind
@@ -528,6 +582,9 @@ CacheOrchestrator.Invalidation.CacheInvalidationKind.Domains = 3 -> CacheOrchest
 CacheOrchestrator.Invalidation.CacheInvalidationKind.Entity = 1 -> CacheOrchestrator.Invalidation.CacheInvalidationKind
 CacheOrchestrator.Invalidation.CacheInvalidationKind.EntityKind = 4 -> CacheOrchestrator.Invalidation.CacheInvalidationKind
 CacheOrchestrator.Invalidation.CacheInvalidationKind.Tags = 2 -> CacheOrchestrator.Invalidation.CacheInvalidationKind
+CacheOrchestrator.Invalidation.CacheInvalidationOrigin
+CacheOrchestrator.Invalidation.CacheInvalidationOrigin.Local = 0 -> CacheOrchestrator.Invalidation.CacheInvalidationOrigin
+CacheOrchestrator.Invalidation.CacheInvalidationOrigin.RemoteCluster = 1 -> CacheOrchestrator.Invalidation.CacheInvalidationOrigin
 CacheOrchestrator.Invalidation.CacheInvalidationResult
 CacheOrchestrator.Invalidation.CacheInvalidationResult.CacheInvalidationResult(string! scope, System.Collections.Generic.IReadOnlyList<string!>! tags, bool dataCacheSucceeded, bool outputSucceeded, System.Collections.Generic.IReadOnlyList<string!>? errors = null, CacheOrchestrator.Cluster.ClusterPublishResult? clusterPublish = null, bool isSkipped = false) -> void
 CacheOrchestrator.Invalidation.CacheInvalidationResult.ClusterPublish.get -> CacheOrchestrator.Cluster.ClusterPublishResult?
@@ -535,6 +592,8 @@ CacheOrchestrator.Invalidation.CacheInvalidationResult.DataCacheSucceeded.get ->
 CacheOrchestrator.Invalidation.CacheInvalidationResult.Errors.get -> System.Collections.Generic.IReadOnlyList<string!>!
 CacheOrchestrator.Invalidation.CacheInvalidationResult.IsSkipped.get -> bool
 CacheOrchestrator.Invalidation.CacheInvalidationResult.OutputSucceeded.get -> bool
+CacheOrchestrator.Invalidation.CacheInvalidationResult.Parts.get -> System.Collections.Generic.IReadOnlyList<CacheOrchestrator.Invalidation.CacheInvalidationResult!>!
+CacheOrchestrator.Invalidation.CacheInvalidationResult.Parts.init -> void
 CacheOrchestrator.Invalidation.CacheInvalidationResult.Scope.get -> string!
 CacheOrchestrator.Invalidation.CacheInvalidationResult.Succeeded.get -> bool
 CacheOrchestrator.Invalidation.CacheInvalidationResult.Tags.get -> System.Collections.Generic.IReadOnlyList<string!>!
@@ -564,15 +623,31 @@ CacheOrchestrator.Orchestration.CacheEntryRequest.Footprint.get -> CacheOrchestr
 CacheOrchestrator.Orchestration.CacheEntryRequest.Footprint.init -> void
 CacheOrchestrator.Orchestration.CacheEntryRequest.Key.get -> string!
 CacheOrchestrator.Orchestration.CacheEntryRequest.Key.init -> void
-CacheOrchestrator.Orchestration.CacheEntryRequest.KeyIsPhysical.get -> bool
-CacheOrchestrator.Orchestration.CacheEntryRequest.KeyIsPhysical.init -> void
 CacheOrchestrator.Orchestration.CacheOrchestratorDomainContextExtensions
+CacheOrchestrator.Orchestration.CacheOrchestratorEntityExtensions
 CacheOrchestrator.Orchestration.DataCacheInvalidationRequest
 CacheOrchestrator.Orchestration.DataCacheInvalidationRequest.DataCacheInvalidationRequest() -> void
 CacheOrchestrator.Orchestration.DataCacheInvalidationRequest.InstanceName.get -> string?
 CacheOrchestrator.Orchestration.DataCacheInvalidationRequest.InstanceName.init -> void
 CacheOrchestrator.Orchestration.DataCacheInvalidationRequest.Tags.get -> System.Collections.Generic.IReadOnlyList<string!>!
 CacheOrchestrator.Orchestration.DataCacheInvalidationRequest.Tags.init -> void
+CacheOrchestrator.Orchestration.DataCacheProviderCapabilities
+CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.DataCacheProviderCapabilities() -> void
+CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.SupportsBackplane.get -> bool
+CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.SupportsBackplane.init -> void
+CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.SupportsBatchInvalidation.get -> bool
+CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.SupportsBatchInvalidation.init -> void
+CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.SupportsEagerRefresh.get -> bool
+CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.SupportsEagerRefresh.init -> void
+CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.SupportsFailSafe.get -> bool
+CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.SupportsFailSafe.init -> void
+CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.SupportsNamedInstances.get -> bool
+CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.SupportsNamedInstances.init -> void
+CacheOrchestrator.Orchestration.DataCacheProviderOutcome
+CacheOrchestrator.Orchestration.DataCacheProviderOutcome.Cached = 1 -> CacheOrchestrator.Orchestration.DataCacheProviderOutcome
+CacheOrchestrator.Orchestration.DataCacheProviderOutcome.Materialized = 2 -> CacheOrchestrator.Orchestration.DataCacheProviderOutcome
+CacheOrchestrator.Orchestration.DataCacheProviderOutcome.Stale = 3 -> CacheOrchestrator.Orchestration.DataCacheProviderOutcome
+CacheOrchestrator.Orchestration.DataCacheProviderOutcome.Unknown = 0 -> CacheOrchestrator.Orchestration.DataCacheProviderOutcome
 CacheOrchestrator.Orchestration.DataCacheProviderRequest
 CacheOrchestrator.Orchestration.DataCacheProviderRequest.DataCacheProviderRequest() -> void
 CacheOrchestrator.Orchestration.DataCacheProviderRequest.DomainOptions.get -> CacheOrchestrator.Configuration.DomainCacheOptions!
@@ -583,6 +658,11 @@ CacheOrchestrator.Orchestration.DataCacheProviderRequest.Key.get -> string!
 CacheOrchestrator.Orchestration.DataCacheProviderRequest.Key.init -> void
 CacheOrchestrator.Orchestration.DataCacheProviderRequest.Tags.get -> System.Collections.Generic.IReadOnlyList<string!>!
 CacheOrchestrator.Orchestration.DataCacheProviderRequest.Tags.init -> void
+CacheOrchestrator.Orchestration.DataCacheProviderResult<T>
+CacheOrchestrator.Orchestration.DataCacheProviderResult<T>.DataCacheProviderResult() -> void
+CacheOrchestrator.Orchestration.DataCacheProviderResult<T>.DataCacheProviderResult(T value, CacheOrchestrator.Orchestration.DataCacheProviderOutcome outcome) -> void
+CacheOrchestrator.Orchestration.DataCacheProviderResult<T>.Outcome.get -> CacheOrchestrator.Orchestration.DataCacheProviderOutcome
+CacheOrchestrator.Orchestration.DataCacheProviderResult<T>.Value.get -> T
 CacheOrchestrator.Orchestration.FootprintCacheBox<T>
 CacheOrchestrator.Orchestration.FootprintCacheBox<T>.Footprint.get -> CacheOrchestrator.Entity.EntityFootprint!
 CacheOrchestrator.Orchestration.FootprintCacheBox<T>.Footprint.init -> void
@@ -593,16 +673,20 @@ CacheOrchestrator.Orchestration.FootprintCacheBox<T>.Value.get -> T?
 CacheOrchestrator.Orchestration.FootprintCacheBox<T>.Value.init -> void
 CacheOrchestrator.Orchestration.ICacheOrchestrator
 CacheOrchestrator.Orchestration.ICacheOrchestrator.GetOrCreateAsync<T>(CacheOrchestrator.Orchestration.CacheEntryRequest! request, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T?>>! factory, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T?>
-CacheOrchestrator.Orchestration.ICacheOrchestrator.GetOrCreateEntityAsync<T>(string! domain, string! logicalKey, CacheOrchestrator.Entity.EntityRef primary, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<CacheOrchestrator.Entity.EntityCache<T>!>>! factory, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T?>
-CacheOrchestrator.Orchestration.ICacheOrchestrator.GetOrCreateEntityAsync<T>(string! domain, string! logicalKey, CacheOrchestrator.Entity.EntityRef primary, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T?>>! factory, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T?>
-CacheOrchestrator.Orchestration.ICacheOrchestrator.GetOrCreateEntitySetAsync<T>(string! domain, string! logicalKey, string! entityKind, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<CacheOrchestrator.Entity.EntitySet<T>!>>! factory, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Collections.Generic.IReadOnlyList<T>!>
 CacheOrchestrator.Orchestration.ICacheOrchestrator.GetOrCreateWithFootprintAsync<T>(CacheOrchestrator.Orchestration.CacheEntryRequest! request, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<CacheOrchestrator.Orchestration.FootprintCacheBox<T?>!>>! factory, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<CacheOrchestrator.Orchestration.FootprintCacheBox<T?>!>
+CacheOrchestrator.Orchestration.IDataCacheBatchInvalidator
+CacheOrchestrator.Orchestration.IDataCacheBatchInvalidator.InvalidateBatchAsync(System.Collections.Generic.IReadOnlyList<CacheOrchestrator.Orchestration.DataCacheInvalidationRequest!>! requests, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 CacheOrchestrator.Orchestration.IDataCacheProvider
+CacheOrchestrator.Orchestration.IDataCacheProvider.GetOrCreateAsync<T>(CacheOrchestrator.Orchestration.DataCacheProviderRequest! request, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! factory, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<CacheOrchestrator.Orchestration.DataCacheProviderResult<T>>
+CacheOrchestrator.Orchestration.IDataCacheProvider.GetOrCreateWithTagsAsync<T>(CacheOrchestrator.Orchestration.DataCacheProviderRequest! request, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! factory, System.Func<T, System.Collections.Generic.IReadOnlyList<string!>!>! tagSelector, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<CacheOrchestrator.Orchestration.DataCacheProviderResult<T>>
 CacheOrchestrator.Orchestration.IDataCacheProvider.InvalidateAsync(CacheOrchestrator.Orchestration.DataCacheInvalidationRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 CacheOrchestrator.Orchestration.IDataCacheProvider.Name.get -> string!
 CacheOrchestrator.Orchestration.IDataCacheProvider.SetAsync<T>(CacheOrchestrator.Orchestration.DataCacheProviderRequest! request, T value, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+CacheOrchestrator.Orchestration.IDataCacheProviderCapabilities
+CacheOrchestrator.Orchestration.IDataCacheProviderCapabilities.Capabilities.get -> CacheOrchestrator.Orchestration.DataCacheProviderCapabilities!
 CacheOrchestrator.Orchestration.IHttpCacheInvalidationSink
 CacheOrchestrator.Orchestration.IHttpCacheInvalidationSink.EvictByTagAsync(string! tag, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+abstract CacheOrchestrator.Cluster.ClusterCommand.<Clone>$() -> CacheOrchestrator.Cluster.ClusterCommand!
 const CacheOrchestrator.Configuration.CacheTags.DomainPrefix = "domain:" -> string!
 const CacheOrchestrator.Configuration.CacheTags.EntityKindPrefix = "entitykind:" -> string!
 const CacheOrchestrator.Configuration.CacheTags.EntityPrefix = "entity:" -> string!
@@ -649,10 +733,7 @@ static CacheOrchestrator.Configuration.CacheTags.EntityKind(string! normalizedDo
 static CacheOrchestrator.Configuration.DomainName.Normalize(string? s) -> string!
 static CacheOrchestrator.Configuration.DomainName.NormalizeEntityKind(string? entityKind) -> string!
 static CacheOrchestrator.Configuration.DomainName.NormalizeResourceId(string? resourceId) -> string!
-static CacheOrchestrator.Configuration.DomainSettingCatalog.Find(string? id) -> CacheOrchestrator.Configuration.DomainSettingCatalogEntry?
-static CacheOrchestrator.Configuration.DomainSettingCatalog.GetEntries() -> System.Collections.Generic.IReadOnlyList<CacheOrchestrator.Configuration.DomainSettingCatalogEntry!>!
-static CacheOrchestrator.Configuration.DomainSettingCatalog.GetOverlayEntries() -> System.Collections.Generic.IReadOnlyList<CacheOrchestrator.Configuration.DomainSettingCatalogEntry!>!
-static CacheOrchestrator.Configuration.DomainSettingCatalog.RegisterSection(System.Type! settingsType, string! idPrefix, string! propertyPrefix) -> void
+static CacheOrchestrator.Configuration.DomainSettingCatalog.RegisterSection(Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Type! settingsType, string! idPrefix, string! propertyPrefix) -> void
 static CacheOrchestrator.DependencyInjection.CacheOrchestratorCoreServiceCollectionExtensions.AddCacheOrchestratorCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration, string! configSection = "Cache") -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static CacheOrchestrator.Diagnostics.CacheOrchestratorHealthCheckExtensions.AddCacheOrchestrator(this Microsoft.Extensions.DependencyInjection.IHealthChecksBuilder! builder, string! name = "cache_orchestrator", Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus failureStatus = Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded, System.TimeSpan? timeout = null, System.Collections.Generic.IEnumerable<string!>? tags = null) -> Microsoft.Extensions.DependencyInjection.IHealthChecksBuilder!
 static CacheOrchestrator.Entity.EntityCache.Create<T>(T value) -> CacheOrchestrator.Entity.EntityCache<T>!
@@ -660,10 +741,10 @@ static CacheOrchestrator.Entity.EntityCache.Miss<T>() -> CacheOrchestrator.Entit
 static CacheOrchestrator.Entity.EntityFootprint.Empty.get -> CacheOrchestrator.Entity.EntityFootprint!
 static CacheOrchestrator.Entity.EntityRef.operator !=(CacheOrchestrator.Entity.EntityRef left, CacheOrchestrator.Entity.EntityRef right) -> bool
 static CacheOrchestrator.Entity.EntityRef.operator ==(CacheOrchestrator.Entity.EntityRef left, CacheOrchestrator.Entity.EntityRef right) -> bool
-static CacheOrchestrator.Entity.EntitySet.Create<T, TId>(System.Collections.Generic.IEnumerable<T>! items, string! entityKind, System.Func<T, TId>! idSelector) -> CacheOrchestrator.Entity.EntitySet<T>!
 static CacheOrchestrator.Entity.EntitySet.Create<T, TId>(System.Collections.Generic.IEnumerable<T>! items, System.Func<T, TId>! idSelector) -> CacheOrchestrator.Entity.EntitySet<T>!
-static CacheOrchestrator.Entity.EntitySet.Create<T>(System.Collections.Generic.IEnumerable<T>! items, string! entityKind, System.Func<T, string!>! idSelector) -> CacheOrchestrator.Entity.EntitySet<T>!
+static CacheOrchestrator.Entity.EntitySet.Create<T, TId>(System.Collections.Generic.IEnumerable<T>! items, string! entityKind, System.Func<T, TId>! idSelector) -> CacheOrchestrator.Entity.EntitySet<T>!
 static CacheOrchestrator.Entity.EntitySet.Create<T>(System.Collections.Generic.IEnumerable<T>! items, System.Func<T, string!>! idSelector) -> CacheOrchestrator.Entity.EntitySet<T>!
+static CacheOrchestrator.Entity.EntitySet.Create<T>(System.Collections.Generic.IEnumerable<T>! items, string! entityKind, System.Func<T, string!>! idSelector) -> CacheOrchestrator.Entity.EntitySet<T>!
 static CacheOrchestrator.Invalidation.CacheInvalidationResult.Aggregate(System.Collections.Generic.IReadOnlyList<CacheOrchestrator.Invalidation.CacheInvalidationResult!>! parts) -> CacheOrchestrator.Invalidation.CacheInvalidationResult!
 static CacheOrchestrator.Invalidation.CacheInvalidationResult.Skipped(string! reason) -> CacheOrchestrator.Invalidation.CacheInvalidationResult!
 static CacheOrchestrator.Invalidation.ICacheOrchestratorInvalidatorExtensions.InvalidateEntitiesAsync<TId>(this CacheOrchestrator.Invalidation.ICacheOrchestratorInvalidator! invalidator, string! domain, string! entityKind, System.Collections.Generic.IEnumerable<TId>! resourceIds, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<CacheOrchestrator.Invalidation.CacheInvalidationResult!>
@@ -673,6 +754,11 @@ static CacheOrchestrator.Orchestration.CacheOrchestratorDomainContextExtensions.
 static CacheOrchestrator.Orchestration.CacheOrchestratorDomainContextExtensions.GetOrCreateEntityAsync<T, TId>(this CacheOrchestrator.Orchestration.ICacheOrchestrator! cache, CacheOrchestrator.Orchestration.CacheDomainContext! domain, string! logicalKey, TId resourceId, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T?>>! factory, string! defaultEntityKind = "entity", System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T?>
 static CacheOrchestrator.Orchestration.CacheOrchestratorDomainContextExtensions.GetOrCreateEntityAsync<T>(this CacheOrchestrator.Orchestration.ICacheOrchestrator! cache, CacheOrchestrator.Orchestration.CacheDomainContext! domain, string! logicalKey, string! resourceId, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<CacheOrchestrator.Entity.EntityCache<T>!>>! factory, string! defaultEntityKind = "entity", System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T?>
 static CacheOrchestrator.Orchestration.CacheOrchestratorDomainContextExtensions.GetOrCreateEntityAsync<T>(this CacheOrchestrator.Orchestration.ICacheOrchestrator! cache, CacheOrchestrator.Orchestration.CacheDomainContext! domain, string! logicalKey, string! resourceId, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T?>>! factory, string! defaultEntityKind = "entity", System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T?>
+static CacheOrchestrator.Orchestration.CacheOrchestratorEntityExtensions.GetOrCreateEntityAsync<T>(this CacheOrchestrator.Orchestration.ICacheOrchestrator! cache, string! domain, string! logicalKey, CacheOrchestrator.Entity.EntityRef primary, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<CacheOrchestrator.Entity.EntityCache<T>!>>! factory) -> System.Threading.Tasks.ValueTask<T?>
+static CacheOrchestrator.Orchestration.CacheOrchestratorEntityExtensions.GetOrCreateEntityAsync<T>(this CacheOrchestrator.Orchestration.ICacheOrchestrator! cache, string! domain, string! logicalKey, CacheOrchestrator.Entity.EntityRef primary, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<CacheOrchestrator.Entity.EntityCache<T>!>>! factory, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<T?>
+static CacheOrchestrator.Orchestration.CacheOrchestratorEntityExtensions.GetOrCreateEntityAsync<T>(this CacheOrchestrator.Orchestration.ICacheOrchestrator! cache, string! domain, string! logicalKey, CacheOrchestrator.Entity.EntityRef primary, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T?>>! factory) -> System.Threading.Tasks.ValueTask<T?>
+static CacheOrchestrator.Orchestration.CacheOrchestratorEntityExtensions.GetOrCreateEntityAsync<T>(this CacheOrchestrator.Orchestration.ICacheOrchestrator! cache, string! domain, string! logicalKey, CacheOrchestrator.Entity.EntityRef primary, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T?>>! factory, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<T?>
+static CacheOrchestrator.Orchestration.CacheOrchestratorEntityExtensions.GetOrCreateEntitySetAsync<T>(this CacheOrchestrator.Orchestration.ICacheOrchestrator! cache, string! domain, string! logicalKey, string! entityKind, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<CacheOrchestrator.Entity.EntitySet<T>!>>! factory, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Collections.Generic.IReadOnlyList<T>!>
 static readonly CacheOrchestrator.Diagnostics.CacheOrchestratorActivitySource.Source -> System.Diagnostics.ActivitySource!
 virtual CacheOrchestrator.Cluster.ClusterCommand.EqualityContract.get -> System.Type!
 virtual CacheOrchestrator.Cluster.ClusterCommand.Equals(CacheOrchestrator.Cluster.ClusterCommand? other) -> bool

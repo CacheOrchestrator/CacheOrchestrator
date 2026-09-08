@@ -9,11 +9,11 @@ namespace CacheOrchestrator.FusionCache;
 /// </summary>
 public sealed class DomainFusionCacheSettings
 {
-    /// <summary>Hard (absolute) duration cap, in seconds.</summary>
+    /// <summary>Cap on base Data Cache freshness, in seconds; 0 disables the cap. Jitter can extend freshness, and fail-safe has a separate retention horizon.</summary>
     [DomainSetting(Kind = DomainSettingValueKind.Int, RuntimeOverlay = true, Group = "TTL", DisplayName = "Fusion hard TTL (seconds)")]
     public int? HardTtlSeconds { get; init; }
 
-    /// <summary>Fail-safe max duration, in seconds.</summary>
+    /// <summary>Maximum fail-safe retention horizon from materialization, in seconds; 0 disables fail-safe. This is not added to the base duration.</summary>
     [DomainSetting(Kind = DomainSettingValueKind.Int, RuntimeOverlay = true, Group = "TTL", DisplayName = "Fusion fail-safe (seconds)")]
     public int? FailSafeSeconds { get; init; }
 

@@ -54,6 +54,12 @@ This profile rewards long cache lifetimes because old content is not expected to
         "DataCache": {
           "TtlSeconds": 2592000
         },
+        "FusionCache": {
+          "HardTtlSeconds": 2592000,
+          "FailSafeSeconds": 0,
+          "JitterSeconds": 0,
+          "EagerRefreshRatio": 0
+        },
         "OutputCache": {
           "TtlSeconds": 604800,
           "ETagMode": "Version"
@@ -71,9 +77,9 @@ This profile rewards long cache lifetimes because old content is not expected to
 }
 ```
 
-This domain keeps Data Cache objects for 30 days, server HTTP responses for 7 days, and client responses for up to 30 days. The [Client Cache Schedule](client-cache-schedule.md) shortens the client `max-age` as the September cutover approaches; it does not change the server TTLs.
+This domain configures a 30-day Data Cache lifetime, a 7-day Output Cache lifetime, and up to 30 days for clients. Entries can be evicted earlier. The explicit Fusion cap permits the full data TTL, while fail-safe, jitter and eager refresh are disabled for this snapshot recipe; Hybrid ignores the Fusion section. The [Client Cache Schedule](client-cache-schedule.md) shortens the client `max-age` as the September cutover approaches; it does not change the server TTLs.
 
-Engine-specific FusionCache settings such as hard TTL, fail-safe, jitter, and factory timeouts can be added under `FusionCache`. They are tuning controls, not part of the snapshot identity.
+Fusion's default `HardTtlSeconds` caps the base data duration at 12 hours, so increasing only `DataCache.TtlSeconds` would not implement this recipe. `HardTtlSeconds` caps base freshness; jitter and the fail-safe horizon are separate controls. These settings do not define snapshot identity.
 
 ### Apply the domain
 
@@ -127,13 +133,19 @@ Keep the domain `Version` stable for ordinary writes. Give each detail endpoint 
         "DataCache": {
           "TtlSeconds": 300
         },
+        "FusionCache": {
+          "HardTtlSeconds": 300,
+          "FailSafeSeconds": 0,
+          "JitterSeconds": 0
+        },
         "OutputCache": {
           "TtlSeconds": 120,
           "ETagMode": "None"
         },
         "ClientCache": {
           "Cacheability": "Public",
-          "TtlSeconds": 30
+          "TtlSeconds": 30,
+          "TtlMinSeconds": 5
         }
       }
     }
@@ -141,7 +153,7 @@ Keep the domain `Version` stable for ordinary writes. Give each detail endpoint 
 }
 ```
 
-The server entries may live longer because the write path removes them immediately. Their TTLs remain a safety bound if an invalidation is missed.
+The server entries may live longer because the write path removes them immediately. Their individual TTLs limit fallback retention when an invalidation is missed. The example disables Fusion fail-safe and jitter. Layering can extend end-to-end staleness: Output Cache can store a response made from a Data Cache value close to its expiry, then retain it for another output TTL. Do not interpret one layer's TTL as an overall freshness guarantee.
 
 The 30-second public client TTL is a product decision, not a server invalidation guarantee. A browser may serve the old response for those 30 seconds after a write. Use a shorter TTL or `NoStore` when browsers must observe changes sooner; `Private` prevents shared caching but still permits browser caching. A configured [Edge integration](edge.md) queues tag purges for CDN copies independently of the browser TTL. Until purge completes, or if it fails, the Edge cache follows its own freshness policy.
 
@@ -200,7 +212,7 @@ GET /api/products/42  → miss → database says 12.50 → store new entries
 GET /api/products/7   → still a hit
 ```
 
-> The optional Entity Framework Core integration can automatically invalidate changed entities upon a successful `SaveChanges` call. See [EF Core invalidation](../reference/ef-core-invalidation.md).
+> The optional Entity Framework Core integration can automatically invalidate changed entities after successful `SaveChanges` when no outer transaction exists, or after the surrounding observed transaction commits. See [EF Core invalidation](../reference/ef-core-invalidation.md).
 
 ## Collections and related data
 

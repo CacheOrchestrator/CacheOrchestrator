@@ -12,6 +12,7 @@
 	<ItemGroup>
 		<None Update="Edge\Varnish\default.vcl" CopyToOutputDirectory="PreserveNewest" />
 		<None Update="Edge\Varnish\nginx.conf" CopyToOutputDirectory="PreserveNewest" />
+		<None Include="..\..\docs\guide\domain-profiles.md" Link="Documentation\domain-profiles.md" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>
 
 	<ItemGroup>

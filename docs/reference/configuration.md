@@ -298,7 +298,7 @@ Same JSON object as portable `DataCache`; bound by `CacheOrchestrator.AspNetCore
 | `Cacheability` | `Public` | `Public`, `Private`, `NoStore` |
 | `TtlSeconds` | `3600` | Target max-age far from schedule; `0` emits `max-age=0` and disables the schedule ramp |
 | `TtlMinSeconds` | `60` | Floor max-age near/at update and during hold; also the enabled Edge fresh-TTL floor, clamped to the Edge maximum; `0` is valid and the value is ignored when `TtlSeconds` is `0` |
-| `ScheduledUpdateUtc` | null | Planned cutover; linear ramp of client and enabled Edge fresh TTLs toward min; changes apply to subsequent responses without an Edge purge |
+| `ScheduledUpdateUtc` | null | Planned cutover; linear ramp of client and enabled Edge fresh TTLs toward min; changes normally apply to subsequent responses; moving the schedule earlier with `ApplyImmediately` also purges Edge |
 | `MustRevalidateNearUpdate` | false | Append `must-revalidate` at min floor |
 | `ForcePrivateWhenAuthenticated` | true | Force client Private for signed-in Identity + Public |
 
@@ -310,8 +310,8 @@ Bound from `Cache:DomainDefaults:FusionCache` / `Cache:Domains:{name}:FusionCach
 
 | Property | Default* | Description |
 |----------|----------|-------------|
-| `HardTtlSeconds` | `43200` | Caps soft/`DataCache.TtlSeconds` if soft &gt; hard |
-| `FailSafeSeconds` | `86400` | Fail-safe max duration (seconds) |
+| `HardTtlSeconds` | `43200` | Caps base `DataCache.TtlSeconds`; 0 disables this cap. It does not cap jitter or fail-safe retention |
+| `FailSafeSeconds` | `86400` | Total fail-safe retention horizon from materialization, not an additional stale duration; 0 disables fail-safe. When enabled, must be at least the capped base Data Cache duration |
 | `EagerRefreshRatio` | 0.9 | Eager refresh threshold. **`0` = disabled**; values in `(0, 1)` allowed; `>= 1` fails validation |
 | `JitterSeconds` | `60` | Max jitter on duration (seconds) |
 | `FactorySoftTimeoutSeconds` | `1` | Factory soft timeout (seconds) |

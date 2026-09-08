@@ -64,7 +64,7 @@ Feature name: **Client Cache Schedule**.
 Pure logic: `ClientCacheHeaderGenerator` + `ClientCacheSchedulePhase`.
 
 - `ScheduledUpdateUtc` + `ClientTtlSeconds` / `ClientTtlMinSeconds` → long client `max-age` in **Calm**, linear ramp-down in **Approaching**, floor in **Hold**.  
-- Affects **client** `Cache-Control` only, not server Output/Fusion TTLs.  
+- Affects **client** `Cache-Control` and enabled **Edge** fresh TTLs, not server Output/Data Cache TTLs. Edge stale windows remain independent.  
 - Phase is exposed on **`X-CacheOrchestrator` (`phase=`)** and metrics **`cache_orchestrator.client.schedule`** (tags `domain`, `phase`).
 - Human docs: `docs/guide/client-cache-schedule.md`, README section “Client Cache Schedule”.
 
@@ -77,8 +77,8 @@ Pure logic: `ClientCacheHeaderGenerator` + `ClientCacheSchedulePhase`.
 | `AddCacheOrchestratorFusionCache` / `IFusionCacheBackendRegistrar` | `CacheOrchestrator.DependencyInjection` / `CacheOrchestrator.FusionCache.Backends` |
 | `AddCacheOrchestratorHybridCache` | `CacheOrchestrator.DependencyInjection` (HybridCache package) |
 | `AddRedisBackend` (meta Redis composition) | `CacheOrchestrator.Redis` |
-| `AddRedisOutputCacheBackend` | `CacheOrchestrator.AspNetCore.Redis` |
-| `AddRedisFusionCacheBackend` | `CacheOrchestrator.FusionCache.Redis` |
+| `AddRedisOutputCacheBackend` | `CacheOrchestrator.Redis` (AspNetCore.Redis package) |
+| `AddRedisFusionCacheBackend` | `CacheOrchestrator.Redis` (FusionCache.Redis package) |
 | `CacheOutputWithDomain` / `CacheOutputWithDomainTemplate` / `CacheOutputWithDomainAttribute` | `CacheOrchestrator.OutputCache` |
 | `[CacheDomain("…")]` | `CacheOrchestrator.OutputCache` |
 | `WithCacheIdentity` / `WithContentHashCacheIdentity` / `[CacheIdentity]` / `[ContentHashCacheIdentity]` / `AddCacheIdentityContract<T>` / `ICacheIdentityContract` / `CacheIdentities.Url` | `CacheOrchestrator.Identity` |
