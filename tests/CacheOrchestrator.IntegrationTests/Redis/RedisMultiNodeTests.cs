@@ -195,8 +195,8 @@ public class RedisMultiNodeTests
         vA.Should().Be("l2-value");
         factoryA.Should().Be(1);
 
-        // Allow distributed write to settle
-        await Task.Delay(200, TestContext.Current.CancellationToken);
+        string key = FusionCacheProbe.GetDataKey(spA, httpA, domain);
+        await FusionCacheProbe.WaitForEntryAsync(spA, key, present: true, distributedOnly: true);
 
         DefaultHttpContext httpB = new();
         httpB.Request.Method = "GET";
@@ -264,8 +264,10 @@ public class RedisMultiNodeTests
 
         int factoryB = 0;
 
-        await cacheA.GetOrSetAsync(MakeHttp(domainsA), _ => Task.FromResult("seed"), TestContext.Current.CancellationToken);
-        await Task.Delay(200, TestContext.Current.CancellationToken);
+        DefaultHttpContext seedRequest = MakeHttp(domainsA);
+        string key = FusionCacheProbe.GetDataKey(spA, seedRequest, domain);
+        await cacheA.GetOrSetAsync(seedRequest, _ => Task.FromResult("seed"), TestContext.Current.CancellationToken);
+        await FusionCacheProbe.WaitForEntryAsync(spA, key, present: true, distributedOnly: true);
 
         // Populate B L1 from L2
         await cacheB.GetOrSetAsync(MakeHttp(domainsB), _ =>
@@ -278,8 +280,8 @@ public class RedisMultiNodeTests
         await spA.GetRequiredService<ICacheOrchestratorInvalidator>()
             .InvalidateDomainAsync(domain, TestContext.Current.CancellationToken);
 
-        // Backplane + L2 tag removal: B should miss after a short settle.
-        await Task.Delay(300, TestContext.Current.CancellationToken);
+        // Observe invalidation without populating a replacement value before the assertion.
+        await FusionCacheProbe.WaitForEntryAsync(spB, key, present: false);
 
         string after = await cacheB.GetOrSetAsync(MakeHttp(domainsB), _ =>
         {

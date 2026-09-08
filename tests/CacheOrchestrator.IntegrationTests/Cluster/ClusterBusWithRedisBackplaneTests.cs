@@ -40,6 +40,7 @@ public class ClusterBusWithRedisBackplaneTests
     {
         private int _count;
         public int Count => Volatile.Read(ref _count);
+        public string DataKey { get; set; } = "";
         public void Increment() => Interlocked.Increment(ref _count);
     }
 
@@ -160,6 +161,7 @@ public class ClusterBusWithRedisBackplaneTests
         app.MapGet(path, async (HttpContext http, IDomainDataCache cache, HitCounter h) =>
         {
             h.Increment();
+            h.DataKey = FusionCacheProbe.GetDataKey(http.RequestServices, http, domain);
             string value = await cache
                 .GetOrSetAsync(http, domain, _ => Task.FromResult("payload-" + domain), http.RequestAborted)
                 .ConfigureAwait(false);
@@ -197,10 +199,11 @@ public class ClusterBusWithRedisBackplaneTests
         await using (a)
         await using (b)
         {
-            // Warm both: A writes L2; B hydrates L1 from L2 (or runs factory once).
+            // Wait for each warm value to reach L2 before testing invalidation.
             (await a.Client.GetAsync(path, Ct)).EnsureSuccessStatusCode();
-            await Task.Delay(250, Ct); // allow L2 write to settle
+            await FusionCacheProbe.WaitForEntryAsync(a.App.Services, a.Hits.DataKey, present: true, distributedOnly: true);
             (await b.Client.GetAsync(path, Ct)).EnsureSuccessStatusCode();
+            await FusionCacheProbe.WaitForEntryAsync(b.App.Services, b.Hits.DataKey, present: true, distributedOnly: true);
 
             int hitsAAfterWarm = a.Hits.Count;
             int hitsBAfterWarm = b.Hits.Count;
@@ -218,8 +221,9 @@ public class ClusterBusWithRedisBackplaneTests
                 .InvalidateDomainAsync(domain, Ct);
             result.Succeeded.Should().BeTrue();
 
-            // Backplane + bus peer apply both async
-            await Task.Delay(500, Ct);
+            // HttpBus has acknowledged peer execution; also observe native cache invalidation.
+            await FusionCacheProbe.WaitForEntryAsync(a.App.Services, a.Hits.DataKey, present: false);
+            await FusionCacheProbe.WaitForEntryAsync(b.App.Services, b.Hits.DataKey, present: false);
 
             (await a.Client.GetAsync(path, Ct)).EnsureSuccessStatusCode();
             (await b.Client.GetAsync(path, Ct)).EnsureSuccessStatusCode();
@@ -257,7 +261,7 @@ public class ClusterBusWithRedisBackplaneTests
                 await a.Client.PostAsync($"/cache-admin/local/domains/{domain}/version", body, Ct);
             response.EnsureSuccessStatusCode();
 
-            await Task.Delay(400, Ct);
+            // Successful distributed settings responses acknowledge the peer mutation.
 
             Admin.AdminDomainConfigDto? bDomain = await b.Client
                 .GetFromJsonAsync<Admin.AdminDomainConfigDto>($"/cache-admin/local/domains/{domain}", Ct);
@@ -283,12 +287,14 @@ public class ClusterBusWithRedisBackplaneTests
         await using (b)
         {
             (await a.Client.GetAsync(path, Ct)).EnsureSuccessStatusCode();
-            await Task.Delay(200, Ct);
+            await FusionCacheProbe.WaitForEntryAsync(a.App.Services, a.Hits.DataKey, present: true, distributedOnly: true);
             (await b.Client.GetAsync(path, Ct)).EnsureSuccessStatusCode();
+            await FusionCacheProbe.WaitForEntryAsync(b.App.Services, b.Hits.DataKey, present: true, distributedOnly: true);
 
             await a.App.Services.GetRequiredService<ICacheOrchestratorInvalidator>()
                 .InvalidateDomainAsync(domain, Ct);
-            await Task.Delay(500, Ct);
+            await FusionCacheProbe.WaitForEntryAsync(a.App.Services, a.Hits.DataKey, present: false);
+            await FusionCacheProbe.WaitForEntryAsync(b.App.Services, b.Hits.DataKey, present: false);
 
             HttpResponseMessage ra = await a.Client.GetAsync(path, Ct);
             HttpResponseMessage rb = await b.Client.GetAsync(path, Ct);

@@ -240,7 +240,6 @@ public class ClusterBusMultiHostTests
                 await invA.InvalidateDomainAsync(domain, Ct);
             result.Succeeded.Should().BeTrue();
 
-            await Task.Delay(400, Ct);
 
             (await a.Client.GetAsync(path, Ct)).EnsureSuccessStatusCode();
             (await b.Client.GetAsync(path, Ct)).EnsureSuccessStatusCode();
@@ -322,7 +321,6 @@ public class ClusterBusMultiHostTests
 
         await a.App.Services.GetRequiredService<ICacheOrchestratorInvalidator>()
             .InvalidateEntityAsync(domain, "products", "42", Ct);
-        await Task.Delay(400, Ct);
 
         (await a.Client.GetAsync("/api/products/42", Ct)).EnsureSuccessStatusCode();
         (await b.Client.GetAsync("/api/products/42", Ct)).EnsureSuccessStatusCode();
@@ -457,7 +455,6 @@ public class ClusterBusMultiHostTests
                 await a.Client.PostAsync($"/cache-admin/local/domains/{domain}/version", body, Ct);
             response.EnsureSuccessStatusCode();
 
-            await Task.Delay(400, Ct);
 
             AdminDomainConfigDto? bDomain = await b.Client
                 .GetFromJsonAsync<AdminDomainConfigDto>($"/cache-admin/local/domains/{domain}", Ct);
@@ -535,7 +532,6 @@ public class ClusterBusMultiHostTests
             (await a.Client.PostAsync($"/cache-admin/local/domains/{domain}/version", body, Ct))
                 .EnsureSuccessStatusCode();
 
-            await Task.Delay(300, Ct);
 
             AdminDomainConfigDto? aDomain = await a.Client
                 .GetFromJsonAsync<AdminDomainConfigDto>($"/cache-admin/local/domains/{domain}", Ct);
@@ -566,7 +562,6 @@ public class ClusterBusMultiHostTests
                 Content = body
             };
             (await a.Client.SendAsync(req, Ct)).EnsureSuccessStatusCode();
-            await Task.Delay(400, Ct);
 
             AdminDomainConfigDto? bDomain = await b.Client
                 .GetFromJsonAsync<AdminDomainConfigDto>($"/cache-admin/local/domains/{domain}", Ct);
@@ -683,7 +678,6 @@ public class ClusterBusMultiHostTests
 
         await a.App.Services.GetRequiredService<ICacheOrchestratorInvalidator>()
             .InvalidateDomainAsync(domain, Ct);
-        await Task.Delay(400, Ct);
 
         (await b.Client.GetAsync("/api/x", Ct)).EnsureSuccessStatusCode();
         b.Hits.Count.Should().Be(2);
@@ -730,7 +724,6 @@ public class ClusterBusMultiHostTests
 
         await h2.App.Services.GetRequiredService<ICacheOrchestratorInvalidator>()
             .InvalidateDomainAsync(domain, Ct);
-        await Task.Delay(500, Ct);
 
         foreach (ClusterHost h in new[] { h1, h2, h3 })
             (await h.Client.GetAsync("/api/s", Ct)).EnsureSuccessStatusCode();
@@ -787,7 +780,6 @@ public class ClusterBusMultiHostTests
 
         await a.App.Services.GetRequiredService<ICacheOrchestratorInvalidator>()
             .InvalidateDomainAsync(domain, Ct);
-        await Task.Delay(500, Ct);
 
         (await a.Client.GetAsync("/api/sd", Ct)).EnsureSuccessStatusCode();
         (await b.Client.GetAsync("/api/sd", Ct)).EnsureSuccessStatusCode();
@@ -809,7 +801,6 @@ public class ClusterBusMultiHostTests
 
             await a.App.Services.GetRequiredService<ICacheOrchestratorInvalidator>()
                 .InvalidateDomainAsync(domain, Ct);
-            await Task.Delay(400, Ct);
 
             (await b.Client.GetAsync("/api/p", Ct)).EnsureSuccessStatusCode();
             b.Hits.Count.Should().Be(2);
@@ -833,7 +824,6 @@ public class ClusterBusMultiHostTests
                 Encoding.UTF8,
                 "application/json");
             (await a.Client.PostAsync("/cache-admin/local/invalidate", body, Ct)).EnsureSuccessStatusCode();
-            await Task.Delay(400, Ct);
 
             (await b.Client.GetAsync("/api/a", Ct)).EnsureSuccessStatusCode();
             b.Hits.Count.Should().Be(2);
