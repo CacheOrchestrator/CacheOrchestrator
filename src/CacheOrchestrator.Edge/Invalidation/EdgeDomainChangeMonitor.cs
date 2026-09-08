@@ -28,6 +28,7 @@ internal sealed class EdgeDomainChangeMonitor : BackgroundService,
     private readonly EdgeTagProjector _projector;
     private readonly IEdgeInvalidationQueue _queue;
     private readonly ILogger<EdgeDomainChangeMonitor> _logger;
+    private readonly TaskCompletionSource _initialized = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Channel<bool> _reloads = Channel.CreateUnbounded<bool>(new UnboundedChannelOptions
     {
         SingleReader = true,
@@ -107,6 +108,15 @@ internal sealed class EdgeDomainChangeMonitor : BackgroundService,
             cancellationToken).ConfigureAwait(false);
     }
 
+    public override async Task StartAsync(CancellationToken cancellationToken)
+    {
+        await base.StartAsync(cancellationToken).ConfigureAwait(false);
+        // .NET 10 schedules ExecuteAsync on the pool. The host must not start serving
+        // requests until reload observation and its initial comparison state are ready.
+        Task completed = await Task.WhenAny(_initialized.Task, ExecuteTask!).WaitAsync(cancellationToken).ConfigureAwait(false);
+        await completed.ConfigureAwait(false);
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using IDisposable registration = ChangeToken.OnChange(
@@ -114,6 +124,7 @@ internal sealed class EdgeDomainChangeMonitor : BackgroundService,
             () => _reloads.Writer.TryWrite(true));
 
         IReadOnlyDictionary<string, EdgeDomainSnapshot> previous = CaptureSnapshot();
+        _initialized.TrySetResult();
         try
         {
             await PurgeOnStartupAsync(previous, stoppingToken).ConfigureAwait(false);

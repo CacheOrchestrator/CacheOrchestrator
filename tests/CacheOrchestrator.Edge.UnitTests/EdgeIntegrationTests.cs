@@ -386,9 +386,60 @@ public class EdgeIntegrationTests
         queue.Jobs.Should().ContainSingle();
     }
 
+    [Fact]
+    public async Task StartAsync_WaitsForInitialSnapshotBeforeHostCanAcceptReloads()
+    {
+        using var release = new ManualResetEventSlim();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        IConfiguration configuration = Substitute.For<IConfiguration>();
+        IConfigurationSection section = Substitute.For<IConfigurationSection>();
+        configuration.GetSection("Cache").Returns(section);
+        configuration.GetReloadToken().Returns(new Microsoft.Extensions.Primitives.CancellationChangeToken(CancellationToken.None));
+        section.GetChildren().Returns(_ =>
+        {
+            entered.TrySetResult();
+            if (!release.Wait(TimeSpan.FromSeconds(10)))
+                throw new TimeoutException("Snapshot barrier was not released.");
+            return Array.Empty<IConfigurationSection>();
+        });
+        (EdgeDomainChangeMonitor sut, _) = CreateVersionObserver(new TestProvider(), true, configuration);
+        using (sut)
+        {
+#if NET10_0_OR_GREATER
+            Task start = sut.StartAsync(TestContext.Current.CancellationToken);
+#else
+            // Before .NET 10 the initial snapshot runs synchronously inside StartAsync.
+            Task start = Task.Run(() => sut.StartAsync(TestContext.Current.CancellationToken), TestContext.Current.CancellationToken);
+#endif
+            try
+            {
+                await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+                start.IsCompleted.Should().BeFalse("the initial snapshot is still blocked");
+            }
+            finally { release.Set(); }
+            await start;
+            await sut.StopAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task StartAsync_PropagatesInitialSnapshotFailure()
+    {
+        IConfiguration configuration = Substitute.For<IConfiguration>();
+        configuration.GetReloadToken().Returns(new Microsoft.Extensions.Primitives.CancellationChangeToken(CancellationToken.None));
+        configuration.GetSection("Cache").Returns(_ => throw new InvalidOperationException("Invalid initial snapshot."));
+        (EdgeDomainChangeMonitor sut, _) = CreateVersionObserver(new TestProvider(), true, configuration);
+        using (sut)
+        {
+            Func<Task> start = () => sut.StartAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(10));
+            await start.Should().ThrowAsync<InvalidOperationException>().WithMessage("Invalid initial snapshot.");
+        }
+    }
+
     private static (EdgeDomainChangeMonitor Observer, RecordingQueue Queue) CreateVersionObserver(
         TestProvider provider,
-        bool enabled)
+        bool enabled,
+        IConfiguration? configuration = null)
     {
         CacheOrchestratorEdgeOptions edgeOptions = CreateEdgeOptions(provider, enabled);
         IOptionsMonitor<CacheOrchestratorEdgeOptions> edgeMonitor = Substitute.For<IOptionsMonitor<CacheOrchestratorEdgeOptions>>();
@@ -400,7 +451,7 @@ public class EdgeIntegrationTests
         ServiceProvider services = new ServiceCollection().BuildServiceProvider();
         return (
             new EdgeDomainChangeMonitor(
-                new EdgeConfigurationRegistration(new ConfigurationBuilder().Build(), "Cache"),
+                new EdgeConfigurationRegistration(configuration ?? new ConfigurationBuilder().Build(), "Cache"),
                 services,
                 new DomainEdgeOptionsProvider(edgeMonitor),
                 instances,
