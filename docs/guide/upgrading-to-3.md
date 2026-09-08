@@ -1,5 +1,10 @@
 # Upgrading to 3.0
 
+> [!IMPORTANT]
+> CacheOrchestrator v3 is a **full redesign**, not an incremental evolution of 1.x / 2.x. Previously published versions (v1.0.0 and v2.1.x) remain available for existing applications. v3 does not preserve API compatibility or offer a drop-in upgrade path; please treat it as a new architectural surface under the same name.
+>
+> **Upgrading from 2.x or an earlier v3 beta** requires manual adaptation. This document explains package composition, breaking API and configuration changes, cache namespaces, deployment, and rollback. Existing configurations and custom implementations will require review.
+
 3.0 establishes a new package and extension contract. Upgrade the application and all CacheOrchestrator satellite packages together. This guide applies both to 2.x applications and to applications running an earlier 3.0 beta; beta cache entries and custom implementations are not a compatibility baseline for the final contract.
 
 ## Choose the application composition

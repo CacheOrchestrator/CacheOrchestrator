@@ -256,13 +256,13 @@ The library is **modular**. `CacheOrchestrator.Core` provides the foundational p
 ## Prerelease status
 
 > [!IMPORTANT]
+> CacheOrchestrator v3 is a **full redesign**, not an incremental evolution of 1.x / 2.x. Previously published versions (v1.0.0 and v2.1.x) remain available for existing applications. v3 does not preserve API compatibility or offer a drop-in upgrade path; please treat it as a new architectural surface under the same name.
+>
+> **Upgrading from 2.x or an earlier v3 beta** requires manual adaptation. Start with [Upgrading to 3.0](docs/guide/upgrading-to-3.md). It explains package composition, breaking API and configuration changes, cache namespaces, deployment, and rollback. Existing configurations and custom implementations will require review.
+>
 > **CacheOrchestrator v3 is in prerelease (beta).** Public APIs and behavior may change until the stable **3.0.0** release.
 >
-> **Upgrading from 2.x or an earlier v3 beta?** Start with [Upgrading to 3.0](docs/guide/upgrading-to-3.md). It explains package composition, breaking API and configuration changes, cache namespaces, deployment and rollback. The guide covers the migration steps; existing configurations and custom implementations require review and adaptation.
->
-> This documentation describes **CacheOrchestrator v3**. For a new application, follow the Quick start above and install with `--prerelease`.
->
-> **Help test the prerelease.** Reports from real ASP.NET Core applications, standalone workers, Redis deployments, browsers, and playground labs are welcome — see [Contributing](CONTRIBUTING.md#help-test-v3). Repository documentation may describe changes newer than the latest published beta.
+> **Help test the prerelease.** Reports from real ASP.NET Core applications, standalone workers, Redis deployments, browsers, and playground labs are highly appreciated — see [Contributing](CONTRIBUTING.md#help-test-v3). Note that repository documentation may describe changes newer than the latest published beta package.
 
 ---
 
