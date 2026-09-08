@@ -182,7 +182,7 @@ public class CacheInvalidationEdgeCaseTests
     }
 
     [Fact]
-    public async Task TransactionRollback_AfterSaveChanges_AlreadyInvalidated()
+    public async Task TransactionRollback_AfterSaveChanges_DoesNotInvalidatePrematurely()
     {
         ICacheOrchestratorInvalidator inv = CreateInvalidator();
         await using SqliteHarness sqlite = await SqliteHarness.CreateAsync(CreateInterceptor(inv));
@@ -199,7 +199,7 @@ public class CacheInvalidationEdgeCaseTests
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         await tx.RollbackAsync(TestContext.Current.CancellationToken);
 
-        await inv.Received(1).InvalidateEntitiesAsync(
+        await inv.DidNotReceive().InvalidateEntitiesAsync(
             "store",
             "products",
             Arg.Any<IEnumerable<string>>(),
@@ -262,7 +262,7 @@ public class CacheInvalidationEdgeCaseTests
             OnBulk = onBulk
         });
         return new CacheInvalidationSaveChangesInterceptor(
-            inv,
+            new CacheInvalidationTransactionInterceptor(inv, NullLogger<CacheInvalidationTransactionInterceptor>.Instance),
             new EntityCacheMappingResolver(monitor),
             monitor,
             NullLogger<CacheInvalidationSaveChangesInterceptor>.Instance);

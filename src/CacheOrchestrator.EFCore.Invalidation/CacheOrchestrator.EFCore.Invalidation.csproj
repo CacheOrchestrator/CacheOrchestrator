@@ -5,7 +5,7 @@
 		<Nullable>enable</Nullable>
 		<LangVersion>latest</LangVersion>
 		<PackageId>CacheOrchestrator.EFCore.Invalidation</PackageId>
-		<Description>EF Core SaveChanges hook for CacheOrchestrator: map CLR types to (domain, entityKind) and purge entity tags after a successful save.</Description>
+		<Description>EF Core SaveChanges hook for CacheOrchestrator: map CLR types to (domain, entityKind) and purge entity tags after a successful transaction commit.</Description>
 		<PackageTags>cache;caching;efcore;entityframework;invalidation;cacheorchestrator;aspnetcore</PackageTags>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageIcon>logo-small.png</PackageIcon>
@@ -24,11 +24,11 @@
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
-		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.22" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.22" />
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
-		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
 	</ItemGroup>
 
 	<ItemGroup>

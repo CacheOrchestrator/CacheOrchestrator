@@ -2,7 +2,7 @@
 
 [**CacheOrchestrator**](https://github.com/CacheOrchestrator/CacheOrchestrator) is a multi-tier cache coordination and synchronized invalidation library for .NET.
 
-This package hooks EF Core **`SaveChanges`**: map a CLR type to `(domain, entityKind)`; after a successful save, matching entity tags are purged through `ICacheOrchestratorInvalidator`.
+This package hooks EF Core **`SaveChanges`**: map a CLR type to `(domain, entityKind)`; after the owning transaction commits, matching entity tags are purged through `ICacheOrchestratorInvalidator`.
 
 ## Install
 
@@ -54,7 +54,7 @@ builder.Services.AddDbContext<AppDbContext>((sp, opt) =>
 modelBuilder.Entity<Product>().CacheInvalidate("catalog", "products");
 ```
 
-Tracked `SaveChanges` invalidates matching entity tags after a successful save. `ExecuteUpdate` and `ExecuteDelete` bypass the change tracker and require explicit invalidation.
+Tracked `SaveChanges` captures generated ids after a successful save. A save without an enclosing transaction invalidates immediately; explicit EF transactions defer and coalesce invalidation until `Commit` / `CommitAsync`, and ambient transactions defer until their completion notification. Rollbacks discard pending invalidation. `ExecuteUpdate` and `ExecuteDelete` bypass the change tracker and require explicit invalidation.
 
 ## Documentation
 
@@ -65,3 +65,5 @@ Tracked `SaveChanges` invalidates matching entity tags after a successful save. 
 ## License
 
 MIT — [LICENSE.md](https://github.com/CacheOrchestrator/CacheOrchestrator/blob/main/LICENSE.md)
+
+Commit externally supplied relational transactions through EF's `IDbContextTransaction` wrapper so the transaction interceptor observes their outcome. A raw ADO.NET commit outside EF requires explicit invalidation after the owner confirms the commit. Delivery is best effort and process local; use an application outbox when invalidation must survive a process failure. See the [transaction contract](https://github.com/CacheOrchestrator/CacheOrchestrator/blob/main/docs/reference/ef-core-invalidation.md#transaction-boundaries).

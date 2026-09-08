@@ -176,9 +176,9 @@ If your application needs to refresh sooner, see [Client cache busting and inval
 
 ### Why did an EF Core bulk update not invalidate anything?
 
-The EF interceptor observes tracked entries after a successful `SaveChanges`. `ExecuteUpdate`, `ExecuteDelete`, and similar bulk operations do not create those ChangeTracker entries.
+The EF interceptor captures tracked entries on `SaveChanges` and invalidates after the owning transaction commits. `ExecuteUpdate`, `ExecuteDelete`, and similar bulk operations do not create those ChangeTracker entries.
 
-After a bulk operation, call `InvalidateEntitiesAsync`, `InvalidateEntityKindAsync`, or another appropriate invalidation explicitly. See [EF Core invalidation](../reference/ef-core-invalidation.md).
+After the bulk operation's transaction commits, call `InvalidateEntitiesAsync`, `InvalidateEntityKindAsync`, or another appropriate invalidation explicitly. See [EF Core invalidation](../reference/ef-core-invalidation.md).
 
 ### Should I invalidate before or after saving?
 
