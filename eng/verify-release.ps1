@@ -112,7 +112,7 @@ try {
     if ($Phase -in 'Consumers', 'All') {
         # A fresh directory/cache plus source mapping proves that every product assembly
         # came from these packages, even when another build has the same MinVer version.
-        $consumer = "$Artifacts/consumer-$([Guid]::NewGuid().ToString('N'))"
+        $consumer = "$Artifacts/consumer-$([Guid]::NewGuid().ToString('N').Substring(0, 8))"
         New-Item -ItemType Directory $consumer | Out-Null
         Copy-Item "$PSScriptRoot/PackageConsumer/*" $consumer -Force
         Copy-Item "$PSScriptRoot/PackageConsumer/.editorconfig" $consumer -Force

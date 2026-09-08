@@ -6,7 +6,7 @@
           <Format>cobertura</Format>
           <Include>[CacheOrchestrator*]*</Include>
           <Exclude>[*.UnitTests]*,[*.IntegrationTests]*</Exclude>
-          <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
+          <ExcludeByAttribute>GeneratedCodeAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
           <UseSourceLink>true</UseSourceLink>
         </Configuration>
       </DataCollector>
