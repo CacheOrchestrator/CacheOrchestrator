@@ -81,3 +81,23 @@ CacheOrchestrator.Admin.DomainSettingsPatchContext.Set<T>(T! settings) -> void
 *REMOVED*CacheOrchestrator.Admin.IDomainSettingsPatchContributor.Apply(string! domain, System.Collections.Generic.IReadOnlyDictionary<string!, System.Text.Json.JsonElement>! settings) -> void
 CacheOrchestrator.Admin.DomainSettingsPatchContext.Remove<T>() -> bool
 CacheOrchestrator.Admin.IDomainSettingsPatchContributor.Validate(CacheOrchestrator.Admin.DomainSettingsPatchContext! context) -> void
+CacheOrchestrator.Cluster.ClusterCommandResult
+CacheOrchestrator.Cluster.ClusterCommandStatus
+CacheOrchestrator.Cluster.ClusterCommandStatus.Applied = 0 -> CacheOrchestrator.Cluster.ClusterCommandStatus
+CacheOrchestrator.Cluster.ClusterCommandStatus.AlreadyApplied = 1 -> CacheOrchestrator.Cluster.ClusterCommandStatus
+CacheOrchestrator.Cluster.ClusterCommandStatus.Failed = 4 -> CacheOrchestrator.Cluster.ClusterCommandStatus
+CacheOrchestrator.Cluster.ClusterCommandStatus.Rejected = 3 -> CacheOrchestrator.Cluster.ClusterCommandStatus
+CacheOrchestrator.Cluster.ClusterCommandStatus.Ignored = 2 -> CacheOrchestrator.Cluster.ClusterCommandStatus
+CacheOrchestrator.Admin.AdminDomainMutationResultDto.LocalInvalidationErrors.get -> System.Collections.Generic.IReadOnlyList<string!>!
+CacheOrchestrator.Admin.AdminDomainMutationResultDto.LocalInvalidationErrors.init -> void
+CacheOrchestrator.Cluster.IClusterCommandHandler.ApplyLocalAsync(CacheOrchestrator.Cluster.ClusterCommand! command, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<CacheOrchestrator.Cluster.ClusterCommandResult!>!
+CacheOrchestrator.Cluster.ClusterCommandResult.ClusterCommandResult(CacheOrchestrator.Cluster.ClusterCommandStatus status, string? reason = null, bool localMutationApplied = false) -> void
+CacheOrchestrator.Cluster.ClusterCommandResult.Status.get -> CacheOrchestrator.Cluster.ClusterCommandStatus
+CacheOrchestrator.Cluster.ClusterCommandResult.Reason.get -> string?
+CacheOrchestrator.Cluster.ClusterCommandResult.Succeeded.get -> bool
+CacheOrchestrator.Cluster.ClusterCommandResult.LocalMutationApplied.get -> bool
+CacheOrchestrator.Cluster.ClusterCommandResult.Invalidation.init -> void
+CacheOrchestrator.Cluster.ClusterCommandResult.Errors.get -> System.Collections.Generic.IReadOnlyList<string!>!
+CacheOrchestrator.Cluster.ClusterCommandResult.Invalidation.get -> CacheOrchestrator.Invalidation.CacheInvalidationResult?
+CacheOrchestrator.Cluster.ClusterCommandResult.Errors.init -> void
+*REMOVED*CacheOrchestrator.Cluster.IClusterCommandHandler.ApplyLocalAsync(CacheOrchestrator.Cluster.ClusterCommand! command, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!

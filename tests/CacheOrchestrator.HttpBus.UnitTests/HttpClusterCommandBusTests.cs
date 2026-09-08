@@ -198,6 +198,33 @@ public class HttpClusterCommandBusTests
     }
 
     [Fact]
+    public async Task PublishAsync_WhenCallerCancels_PropagatesCancellation()
+    {
+        IClusterMembership membership = Substitute.For<IClusterMembership>();
+        membership.GetPeersAsync(Arg.Any<CancellationToken>()).Returns(
+            [new ClusterPeer("b", new Uri("http://127.0.0.1:5002"))]);
+        var handler = new WaitingHandler();
+        HttpClusterCommandBus bus = CreateBus(membership, "a", true, handler);
+        using var canceled = new CancellationTokenSource();
+        Task<ClusterPublishResult> pending = bus.PublishAsync(CreateCommand("a"), canceled.Token);
+        await handler.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        canceled.Cancel();
+        Func<Task> wait = async () => await pending;
+        await wait.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    private sealed class WaitingHandler : HttpMessageHandler
+    {
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Entered.SetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("Cancellation should end the request.");
+        }
+    }
+
+    [Fact]
     public async Task PublishAsync_WhenCommandIsNull_Throws()
     {
         HttpClusterCommandBus bus = CreateBus(

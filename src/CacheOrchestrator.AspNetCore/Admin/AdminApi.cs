@@ -155,7 +155,10 @@ public static class AdminApi
     }
 
     private static IResult MutationResult(AdminDomainMutationResultDto result) =>
-        result.ClusterPublish is { AllSucceeded: false } publish
+        result.LocalInvalidationErrors.Count > 0
+            ? Results.Json(new { error = "Local settings invalidation incomplete.", localApplied = true, result },
+                statusCode: StatusCodes.Status503ServiceUnavailable)
+            : result.ClusterPublish is { AllSucceeded: false } publish
             ? ClusterPublishIncomplete(result.Domain, publish, payload: null)
             : Results.Ok(result);
 

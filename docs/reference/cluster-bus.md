@@ -222,7 +222,7 @@ Every command also carries the common envelope below:
 
 `InvalidateCommand` adds `kind`, human-readable `scope`, final `tags`, and optional domain/entity fields. `VersionBumpCommand` adds `domain` and `version`. `SettingsPatchCommand` adds `domain` and the same sparse setting dictionary accepted by the Admin PATCH endpoint.
 
-For a custom transport or discovery integration, implement the Core contracts rather than reusing the HTTP JSON: `IClusterMembership` discovers `ClusterPeer` records, `IClusterCommandBus` publishes and returns per-peer outcomes, and the receive path calls `IClusterCommandHandler.ApplyLocalAsync`. Define and version that transport's own wire contract, preserve semantic command metadata, report individual peer failures in `ClusterPublishResult`, and never re-publish a received command. See [Extensibility](extensibility.md#cluster-contracts).
+For a custom transport or discovery integration, implement the Core contracts rather than reusing the HTTP JSON: `IClusterMembership` discovers `ClusterPeer` records, `IClusterCommandBus` publishes and returns per-peer outcomes, and the receive path calls `IClusterCommandHandler.ApplyLocalAsync` and honors its `ClusterCommandResult`. Define and version that transport's own wire contract, preserve semantic command metadata, report individual peer failures in `ClusterPublishResult`, and never re-publish a received command. See [Extensibility](extensibility.md#cluster-contracts).
 
 ### Who publishes
 
@@ -262,7 +262,13 @@ Authentication uses a constant-time key comparison. Receive handling also reject
 
 ### Partial failure
 
-Origin local result is **not** failed if a peer times out. Peer errors are logged + `publish_failures` metric.
+The receiver returns **400** for rejected commands and **503** for incomplete local invalidation; neither is reported as applied. Successful execution returns **200** with `status: "Applied"`. A completed duplicate returns **200** with `applied: false`, `succeeded: true` and `status: "AlreadyApplied"`. The response includes invalidation details or settings purge errors. A settings command may return `localMutationApplied: true` with a failure: its overlay was published, but required purging is unfinished.
+
+Concurrent deliveries of the same command share the in-flight execution. Running work does not expire while it is executing. Failed or canceled work can be retried with the same immutable command and ID; successful outcomes are retained for the deduplication window measured from completion. A canceled duplicate waiter does not cancel the owner. For settings, the receiver retains the original purge plan and resumes only unfinished layers, preserving any newer runtime mutation. This state is process-local and bounded by the window; it is not a durable delivery log, a distributed transaction or an ordering guarantee across restarts.
+
+The bus performs one delivery attempt per peer and reports peer errors in `ClusterPublishResult` and `publish_failures`. It does not automatically retry failures. Callers that retry must retain the original command ID and payload and remain within the timestamp freshness window. Caller cancellation propagates; a peer timeout is a failed peer outcome. Admin distribution returns **409** for incomplete peer delivery after local mutation. A local post-settings purge failure returns **503** with the published result and local errors; repair the failed backend and explicitly invalidate the affected domain if retrying through a new Admin request.
+
+Settings publication and capture of its invalidation plan are serialized with other management/cluster settings mutations for the same domain. Network invalidation runs after releasing that control-plane lock. Cache-hit paths are unaffected.
 
 ---
 

@@ -447,7 +447,8 @@ public sealed class StaticMembership : IClusterMembership
 
 // IClusterCommandBus.PublishAsync: deliver command to peers (no cache payloads),
 // return ClusterPublishResult with per-peer success/failure — do not throw for one peer timeout.
-// Received commands must call IClusterCommandHandler.ApplyLocalAsync (anti-echo).
+// Received commands call IClusterCommandHandler.ApplyLocalAsync and honor ClusterCommandResult.
+// Rejected or failed outcomes must not be acknowledged as successful delivery.
 ```
 
 Custom transports must preserve `CommandId`, namespace, origin, timestamp, and correlation id. Command records are semantic Core contracts, not a prescribed wire format. Full rules: [cluster command bus](cluster-bus.md).

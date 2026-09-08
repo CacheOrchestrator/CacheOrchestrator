@@ -116,13 +116,25 @@ internal static class ClusterReceiveApi
             if (string.Equals(command.OriginInstanceId, instanceId.InstanceId, StringComparison.Ordinal))
                 return Results.Ok(new { applied = false, reason = "origin-is-self" });
 
-            await handler.ApplyLocalAsync(command, cancellationToken).ConfigureAwait(false);
-            return Results.Ok(new
+            ClusterCommandResult result = await handler.ApplyLocalAsync(command, cancellationToken).ConfigureAwait(false);
+            int statusCode = result.Status switch
             {
-                applied = true,
+                ClusterCommandStatus.Rejected => StatusCodes.Status400BadRequest,
+                ClusterCommandStatus.Failed => StatusCodes.Status503ServiceUnavailable,
+                _ => StatusCodes.Status200OK
+            };
+            return Results.Json(new
+            {
+                applied = result.Status == ClusterCommandStatus.Applied,
+                succeeded = result.Succeeded,
+                status = result.Status.ToString(),
+                reason = result.Reason,
+                localMutationApplied = result.LocalMutationApplied,
+                invalidation = result.Invalidation,
+                errors = result.Errors,
                 commandId = command.CommandId,
                 commandType = command.GetType().Name
-            });
+            }, statusCode: statusCode);
         });
 
         // When Admin API is enabled it already maps GET …/cluster/info (same prefix).

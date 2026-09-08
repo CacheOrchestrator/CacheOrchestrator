@@ -409,24 +409,16 @@ internal sealed class CacheOrchestratorManagement : ICacheOrchestratorManagement
             throw new ArgumentException("settings must contain at least one entry.", nameof(request));
 
         string normalizedDomain = DomainName.Normalize(domain);
-        string[] settingIds = DomainSettingsInvalidationCoordinator.CanonicalizeSettingIds(request.Settings.Keys);
-        IReadOnlyDictionary<string, System.Text.Json.JsonElement>? before =
-            _settingsInvalidation?.Capture(normalizedDomain, settingIds);
-        DomainSettingsPatchApplicator.Apply(
-            normalizedDomain,
-            request.Settings,
-            _overrides,
-            _settingsContributors);
-
-        if (_settingsInvalidation is not null && before is not null)
+        IReadOnlyList<string> localErrors = [];
+        if (_settingsInvalidation is not null)
         {
-            await _settingsInvalidation.ApplyAsync(
-                    normalizedDomain,
-                    settingIds,
-                    before,
-                    request.ApplyImmediately,
-                    cancellationToken)
-                .ConfigureAwait(false);
+            DomainSettingsInvalidationPlan plan = _settingsInvalidation.ApplyPatch(
+                normalizedDomain, request.Settings, _overrides, _settingsContributors, request.ApplyImmediately);
+            localErrors = await _settingsInvalidation.ApplyAsync(plan, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            DomainSettingsPatchApplicator.Apply(normalizedDomain, request.Settings, _overrides, _settingsContributors);
         }
 
         ClusterPublishResult? clusterPublish = null;
@@ -444,7 +436,8 @@ internal sealed class CacheOrchestratorManagement : ICacheOrchestratorManagement
         {
             Domain = normalizedDomain,
             Effective = _domainConfig.GetDomainConfig(normalizedDomain),
-            ClusterPublish = clusterPublish
+            ClusterPublish = clusterPublish,
+            LocalInvalidationErrors = localErrors
         };
     }
 

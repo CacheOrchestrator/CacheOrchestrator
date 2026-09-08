@@ -11,5 +11,6 @@ public interface IClusterCommandHandler
     /// </summary>
     /// <param name="command">Command received from the origin or Admin distribute path.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    Task ApplyLocalAsync(ClusterCommand command, CancellationToken cancellationToken = default);
+    /// <returns>The actual local outcome; transports must surface rejected or incomplete work as failure.</returns>
+    Task<ClusterCommandResult> ApplyLocalAsync(ClusterCommand command, CancellationToken cancellationToken = default);
 }

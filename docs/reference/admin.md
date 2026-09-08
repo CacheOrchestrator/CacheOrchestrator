@@ -255,6 +255,8 @@ Use `GET /domain-settings/catalog` as the canonical list. A setting is writable 
 
 `distribute: true` carries both the patch and `applyImmediately` to HttpBus peers. Every peer applies its local Output/Data Cache action, while only the originating instance queues the external Edge purge. This avoids one Edge purge per application instance.
 
+If local post-settings purging fails, HTTP **503** includes `localApplied: true` and the mutation `result`, including `localInvalidationErrors`. The published settings remain active. A new Admin PATCH is a new mutation; after repairing the backend, explicitly invalidate the domain when the earlier purge was incomplete.
+
 A successful Version or settings mutation returns the normalized `domain` and complete effective domain snapshot. With `distribute: true`, a peer failure returns `409` with `localApplied: true`, command metadata, and `peerFailures`; the local mutation is not rolled back.
 
 ### Admin API `/stats` (process-lifetime raw snapshot)

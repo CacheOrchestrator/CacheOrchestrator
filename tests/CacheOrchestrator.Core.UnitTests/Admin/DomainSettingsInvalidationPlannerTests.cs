@@ -115,7 +115,8 @@ public sealed class DomainSettingsInvalidationPlannerTests
             ("fusionCache.hardTtlSeconds", 300),
             ("outputCache.ttlSeconds", 300));
 
-        await sut.ApplyAsync("products", settings, before, applyImmediately: true, CancellationToken.None);
+        await sut.ApplyAsync(new DomainSettingsInvalidationPlan("products", "default",
+            DomainSettingsInvalidationPlanner.Plan(settings, before, provider.Values, applyImmediately: true), 0), CancellationToken.None);
 
         await dataCache.Received(1).InvalidateAsync(
             Arg.Any<DataCacheInvalidationRequest>(),
@@ -139,7 +140,8 @@ public sealed class DomainSettingsInvalidationPlannerTests
             ("varyByAccept", false),
             ("varyByHeaders", new[] { "X-Tenant", "X-Locale" }));
 
-        await sut.ApplyAsync("products", settings, before, applyImmediately: false, CancellationToken.None);
+        await sut.ApplyAsync(new DomainSettingsInvalidationPlan("products", "default",
+            DomainSettingsInvalidationPlanner.Plan(settings, before, provider.Values, applyImmediately: false), 1), CancellationToken.None);
 
         observer.Domains.Should().Equal("products");
     }
@@ -156,10 +158,64 @@ public sealed class DomainSettingsInvalidationPlannerTests
 
         using (ClusterCommandScope.EnterRemote())
         {
-            await sut.ApplyAsync("products", settings, before, applyImmediately: false, CancellationToken.None);
+            await sut.ApplyAsync(new DomainSettingsInvalidationPlan("products", "default",
+            DomainSettingsInvalidationPlanner.Plan(settings, before, provider.Values, applyImmediately: false), 1), CancellationToken.None);
         }
 
         observer.Domains.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ConcurrentPatches_CaptureEachTransitionBeforeTheNextMutation()
+    {
+        var state = new DomainRuntimeOverrideStore();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var release = new ManualResetEventSlim();
+        var values = new PausingStateValues(state, entered, release);
+        IDomainCacheOptionsProvider options = Substitute.For<IDomainCacheOptionsProvider>();
+        options.GetOrCreateDomainOptions("products").Returns(new DomainCacheOptions { Domain = "products", DataCacheInstanceName = "default" });
+        var coordinator = new DomainSettingsInvalidationCoordinator(
+            [values], Substitute.For<IDataCacheProvider>(), options, Substitute.For<IHttpCacheInvalidationSink>(), [],
+            NullLogger<DomainSettingsInvalidationCoordinator>.Instance);
+        Task<DomainSettingsInvalidationPlan> first = Task.Run(() => coordinator.ApplyPatch(
+            "products", Values(("dataCache.ttlSeconds", 300)), state, [], true), TestContext.Current.CancellationToken);
+        Task<DomainSettingsInvalidationPlan>? second = null;
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            second = Task.Run(() => coordinator.ApplyPatch(
+                "products", Values(("dataCache.ttlSeconds", 600)), state, [], true), TestContext.Current.CancellationToken);
+            state.Get("products")!.DataCacheTtl.Should().Be(TimeSpan.FromSeconds(300));
+            release.Set();
+            (await first).RemainingTargets.Should().Be(DomainSettingsInvalidationTargets.DataCache);
+            (await second).RemainingTargets.Should().Be(DomainSettingsInvalidationTargets.None);
+        }
+        finally
+        {
+            release.Set();
+            await first;
+            if (second is not null)
+                await second;
+        }
+    }
+
+    private sealed class PausingStateValues(
+        IDomainRuntimeOverrideStore state,
+        TaskCompletionSource entered,
+        ManualResetEventSlim release) : IDomainSettingValueProvider
+    {
+        private int _paused;
+        public bool TryGetValue(string domain, string settingId, out JsonElement value)
+        {
+            int seconds = (int)(state.Get(domain)?.DataCacheTtl?.TotalSeconds ?? 600);
+            if (seconds == 300 && Interlocked.Exchange(ref _paused, 1) == 0)
+            {
+                entered.SetResult();
+                release.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken).Should().BeTrue();
+            }
+            value = JsonSerializer.SerializeToElement(seconds);
+            return settingId == "dataCache.ttlSeconds";
+        }
     }
 
     private static DomainSettingsInvalidationCoordinator CreateCoordinator(
