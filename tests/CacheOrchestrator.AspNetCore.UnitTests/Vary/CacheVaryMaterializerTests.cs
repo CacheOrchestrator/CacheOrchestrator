@@ -20,8 +20,8 @@ public class CacheVaryMaterializerTests
         DefaultHttpContext second = CreateHttp();
         DomainHttpCacheOptions options = CreateOptions();
 
-        CacheVaryMaterial firstResult = materializer.Build(first, options, CacheVarySurface.Fusion);
-        CacheVaryMaterial secondResult = materializer.Build(second, options, CacheVarySurface.Fusion);
+        CacheVaryMaterial firstResult = materializer.Build(first, options, CacheVarySurface.DataCache);
+        CacheVaryMaterial secondResult = materializer.Build(second, options, CacheVarySurface.DataCache);
 
         firstResult.Should().BeSameAs(secondResult);
         firstResult.HeaderNames.Should().BeEmpty();
@@ -60,7 +60,7 @@ public class CacheVaryMaterializerTests
         DefaultHttpContext http = CreateHttp(acceptEncoding: "br");
         DomainHttpCacheOptions opts = CreateOptions(varyEncoding: true);
 
-        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.Fusion);
+        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.DataCache);
 
         material.HeaderNames.Should().NotContain(HeaderNames.AcceptEncoding);
         material.Values["normalized:accept-encoding"].Should().Be("br");
@@ -143,7 +143,7 @@ public class CacheVaryMaterializerTests
                 })));
         DomainHttpCacheOptions opts = CreateOptions(varyByCookies: ["ab_bucket"]);
 
-        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.Fusion);
+        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.DataCache);
 
         material.Values.Should().ContainKey("cookie:ab_bucket");
         material.Values["cookie:ab_bucket"].Should().StartWith("h:");
@@ -173,7 +173,7 @@ public class CacheVaryMaterializerTests
         http.Request.Headers.Authorization = "Bearer x";
         DomainHttpCacheOptions opts = CreateOptions(authBypassMode: AuthBypassMode.AuthenticatedOrAuthorization, varyByUser: true);
 
-        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.Fusion);
+        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.DataCache);
 
         material.Values.Should().NotContainKey("auth-user");
     }
@@ -187,7 +187,7 @@ public class CacheVaryMaterializerTests
             authenticationType: "test"));
         DomainHttpCacheOptions opts = CreateOptions(authBypassMode: AuthBypassMode.Never, varyByUser: true);
 
-        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.Fusion);
+        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.DataCache);
 
         material.Values.Should().ContainKey("auth-user");
         material.Values["auth-user"].Should().Be("u:bob");
@@ -219,7 +219,7 @@ public class CacheVaryMaterializerTests
         DefaultHttpContext http = CreateHttp();
         DomainHttpCacheOptions opts = CreateOptions();
 
-        CacheVaryMaterial material = materializer.Build(http, opts, CacheVarySurface.Fusion);
+        CacheVaryMaterial material = materializer.Build(http, opts, CacheVarySurface.DataCache);
 
         material.Values.Should().ContainKey("a").And.ContainKey("b");
         material.Values["a"].Should().Be("1");
@@ -234,7 +234,7 @@ public class CacheVaryMaterializerTests
             varyByAccept: true,
             acceptNormalization: ["application/json", "application/xml"]);
 
-        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.Fusion);
+        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.DataCache);
 
         http.Request.Headers.Accept.ToString().Should().Be("text/html, application/json;q=0.9");
         material.Values["normalized:accept"].Should().Be("text/html, application/json;q=0.9");
@@ -250,7 +250,7 @@ public class CacheVaryMaterializerTests
             varyByAccept: true,
             acceptNormalization: ["application/json", "application/xml"]);
 
-        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.Fusion);
+        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.DataCache);
 
         http.Request.Headers.Accept.ToString().Should().Be("application/json-seq");
         material.Values["normalized:accept"].Should().Be("application/json-seq");
@@ -264,7 +264,7 @@ public class CacheVaryMaterializerTests
             varyByAccept: true,
             acceptNormalization: ["application/xml", "application/json"]);
 
-        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.Fusion);
+        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.DataCache);
 
         http.Request.Headers.Accept.ToString().Should().Be("application/json");
         material.Values["normalized:accept"].Should().Be("application/json");
@@ -278,7 +278,7 @@ public class CacheVaryMaterializerTests
             varyByAccept: true,
             acceptNormalization: ["application/json", "application/xml"]);
 
-        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.Fusion);
+        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.DataCache);
 
         material.Values["normalized:accept"].Should().Be("application/json;q=0, application/xml;q=1");
         material.ResponseVaryHeaderNames.Should().Contain(HeaderNames.Accept);

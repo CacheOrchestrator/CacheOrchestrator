@@ -101,7 +101,7 @@ public sealed class CacheVaryMaterializer
         if (options.VaryByAcceptLanguage)
             return false;
 
-        if (options.VaryByHeaders is { Length: > 0 } varyHeaders)
+        if (options.VaryByHeadersArray is { Length: > 0 } varyHeaders)
         {
             for (int i = 0; i < varyHeaders.Length; i++)
             {
@@ -110,7 +110,7 @@ public sealed class CacheVaryMaterializer
             }
         }
 
-        if (options.VaryByCookies is { Length: > 0 } varyCookies)
+        if (options.VaryByCookiesArray is { Length: > 0 } varyCookies)
         {
             IRequestCookieCollection cookies = http.Request.Cookies;
             for (int i = 0; i < varyCookies.Length; i++)
@@ -137,7 +137,7 @@ public sealed class CacheVaryMaterializer
         CacheVarySurface surface,
         Builder builder)
     {
-        // Accept-Encoding: OC always varies (historical). Fusion when DataCacheVaryOnEncoding.
+        // Accept-Encoding: OC always varies (historical). Data Cache when DataCacheVaryOnEncoding.
         // Advertise Vary even when the request omits the header so intermediates do not pin a default.
         bool considerEncoding = surface == CacheVarySurface.OutputCache || options.DataCacheVaryOnEncoding;
         StringValues ae = http.Request.Headers.AcceptEncoding;
@@ -145,7 +145,7 @@ public sealed class CacheVaryMaterializer
         {
             if (ae.Count > 0)
             {
-                if (options.EncodingNormalizationList is { Length: > 0 } encodingNormalization)
+                if (options.EncodingNormalizationListArray is { Length: > 0 } encodingNormalization)
                 {
                     builder.AddNormalizedHeader(
                         HeaderNames.AcceptEncoding,
@@ -168,7 +168,7 @@ public sealed class CacheVaryMaterializer
             StringValues accept = http.Request.Headers.Accept;
             if (accept.Count > 0)
             {
-                if (options.AcceptNormalizationList is { Length: > 0 } acceptNormalization)
+                if (options.AcceptNormalizationListArray is { Length: > 0 } acceptNormalization)
                 {
                     builder.AddNormalizedHeader(
                         HeaderNames.Accept,
@@ -191,7 +191,7 @@ public sealed class CacheVaryMaterializer
             StringValues al = http.Request.Headers.AcceptLanguage;
             if (al.Count > 0)
             {
-                if (options.AcceptLanguageNormalizationList is { Length: > 0 } languageNormalization)
+                if (options.AcceptLanguageNormalizationListArray is { Length: > 0 } languageNormalization)
                 {
                     builder.AddNormalizedHeader(
                         HeaderNames.AcceptLanguage,
@@ -209,7 +209,7 @@ public sealed class CacheVaryMaterializer
             }
         }
 
-        string[]? extraHeaders = options.VaryByHeaders;
+        string[]? extraHeaders = options.VaryByHeadersArray;
         if (extraHeaders is { Length: > 0 })
         {
             for (int i = 0; i < extraHeaders.Length; i++)
@@ -230,7 +230,7 @@ public sealed class CacheVaryMaterializer
             }
         }
 
-        string[]? cookies = options.VaryByCookies;
+        string[]? cookies = options.VaryByCookiesArray;
         if (cookies is { Length: > 0 })
         {
             IRequestCookieCollection requestCookies = http.Request.Cookies;
@@ -258,16 +258,16 @@ public sealed class CacheVaryMaterializer
 
     /// <summary>
     /// Output Cache always applies auth-user when varying by user.
-    /// Fusion only does so when auth caching is intentional (<see cref="AuthBypassMode.Never"/>)
-    /// or when <see cref="DomainHttpCacheOptions.VaryByAuthClaims"/> is configured — preserving
-    /// historical Fusion keys under the default auth-bypass modes.
+    /// Data Cache only does so when auth caching is intentional (<see cref="AuthBypassMode.Never"/>)
+    /// or when <see cref="DomainHttpCacheOptions.VaryByAuthClaimsArray"/> is configured — preserving
+    /// Data Cache keys under the default auth-bypass modes.
     /// </summary>
     private static bool ShouldIncludeAuthUserVary(DomainHttpCacheOptions options, CacheVarySurface surface)
     {
         if (surface == CacheVarySurface.OutputCache)
             return true;
 
-        if (options.VaryByAuthClaims is { Length: > 0 })
+        if (options.VaryByAuthClaimsArray is { Length: > 0 })
             return true;
 
         return DomainAuthEvaluator.GetEffectiveAuthBypassMode(options) == AuthBypassMode.Never;
@@ -280,16 +280,16 @@ public sealed class CacheVaryMaterializer
     /// otherwise the selected key list.
     /// </summary>
     /// <remarks>
-    /// When <see cref="DomainHttpCacheOptions.VaryByQueryKeys"/> is <see langword="null"/>, all non-tracking
-    /// keys (minus <see cref="DomainHttpCacheOptions.IgnoreQueryKeys"/>) are returned — historical behaviour.
+    /// When <see cref="DomainHttpCacheOptions.VaryByQueryKeysArray"/> is <see langword="null"/>, all non-tracking
+    /// keys (minus <see cref="DomainHttpCacheOptions.IgnoreQueryKeysArray"/>) are returned — historical behaviour.
     /// </remarks>
     public static IReadOnlyList<string> ResolveQueryKeys(IQueryCollection query, DomainHttpCacheOptions options)
     {
         ArgumentNullException.ThrowIfNull(query);
         ArgumentNullException.ThrowIfNull(options);
 
-        string[]? allow = options.VaryByQueryKeys;
-        string[]? ignore = options.IgnoreQueryKeys;
+        string[]? allow = options.VaryByQueryKeysArray;
+        string[]? ignore = options.IgnoreQueryKeysArray;
 
         if (allow is { Length: 0 })
             return Array.Empty<string>();

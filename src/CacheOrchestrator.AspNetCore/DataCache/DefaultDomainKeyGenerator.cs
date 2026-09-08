@@ -79,7 +79,7 @@ public sealed class DefaultDomainKeyGenerator : IDomainKeyGenerator
 
         try
         {
-            CacheVaryMaterial vary = _materializer.Build(http, opts, CacheVarySurface.Fusion);
+            CacheVaryMaterial vary = _materializer.Build(http, opts, CacheVarySurface.DataCache);
             AppendString(
                 hasher,
                 opts.DataCachePolicyGeneration,

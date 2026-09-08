@@ -23,3 +23,23 @@ CacheOrchestrator.OutputCache.CacheResponseContext.SharedCacheEligible.get -> bo
 CacheOrchestrator.OutputCache.CacheResponseContext.Tags.get -> System.Collections.Generic.IReadOnlyList<string!>!
 CacheOrchestrator.OutputCache.ICacheResponseContributor
 CacheOrchestrator.OutputCache.ICacheResponseContributor.ContributeAsync(CacheOrchestrator.OutputCache.CacheResponseContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+CacheOrchestrator.Configuration.DomainHttpCacheOptions.AcceptLanguageNormalizationList.get -> System.Collections.Generic.IReadOnlyList<string!>?
+CacheOrchestrator.Configuration.DomainHttpCacheOptions.AcceptNormalizationList.get -> System.Collections.Generic.IReadOnlyList<string!>?
+CacheOrchestrator.Configuration.DomainHttpCacheOptions.CacheableStatusCodes.get -> System.Collections.Generic.IReadOnlyList<int>!
+CacheOrchestrator.Configuration.DomainHttpCacheOptions.EncodingNormalizationList.get -> System.Collections.Generic.IReadOnlyList<string!>?
+CacheOrchestrator.Configuration.DomainHttpCacheOptions.IgnoreQueryKeys.get -> System.Collections.Generic.IReadOnlyList<string!>?
+CacheOrchestrator.Configuration.DomainHttpCacheOptions.VaryByAuthClaims.get -> System.Collections.Generic.IReadOnlyList<string!>?
+CacheOrchestrator.Configuration.DomainHttpCacheOptions.VaryByCookies.get -> System.Collections.Generic.IReadOnlyList<string!>?
+CacheOrchestrator.Configuration.DomainHttpCacheOptions.VaryByHeaders.get -> System.Collections.Generic.IReadOnlyList<string!>?
+CacheOrchestrator.Configuration.DomainHttpCacheOptions.VaryByQueryKeys.get -> System.Collections.Generic.IReadOnlyList<string!>?
+CacheOrchestrator.Vary.CacheVarySurface.DataCache = 1 -> CacheOrchestrator.Vary.CacheVarySurface
+*REMOVED*CacheOrchestrator.Configuration.DomainHttpCacheOptions.AcceptLanguageNormalizationList.get -> string![]?
+*REMOVED*CacheOrchestrator.Configuration.DomainHttpCacheOptions.AcceptNormalizationList.get -> string![]?
+*REMOVED*CacheOrchestrator.Configuration.DomainHttpCacheOptions.CacheableStatusCodes.get -> int[]!
+*REMOVED*CacheOrchestrator.Configuration.DomainHttpCacheOptions.EncodingNormalizationList.get -> string![]?
+*REMOVED*CacheOrchestrator.Configuration.DomainHttpCacheOptions.IgnoreQueryKeys.get -> string![]?
+*REMOVED*CacheOrchestrator.Configuration.DomainHttpCacheOptions.VaryByAuthClaims.get -> string![]?
+*REMOVED*CacheOrchestrator.Configuration.DomainHttpCacheOptions.VaryByCookies.get -> string![]?
+*REMOVED*CacheOrchestrator.Configuration.DomainHttpCacheOptions.VaryByHeaders.get -> string![]?
+*REMOVED*CacheOrchestrator.Configuration.DomainHttpCacheOptions.VaryByQueryKeys.get -> string![]?
+*REMOVED*CacheOrchestrator.Vary.CacheVarySurface.Fusion = 1 -> CacheOrchestrator.Vary.CacheVarySurface

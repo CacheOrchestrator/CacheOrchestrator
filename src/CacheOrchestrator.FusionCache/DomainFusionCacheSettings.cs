@@ -11,33 +11,33 @@ public sealed class DomainFusionCacheSettings
 {
     /// <summary>Hard (absolute) duration cap, in seconds.</summary>
     [DomainSetting(Kind = DomainSettingValueKind.Int, RuntimeOverlay = true, Group = "TTL", DisplayName = "Fusion hard TTL (seconds)")]
-    public int? HardTtlSeconds { get; set; }
+    public int? HardTtlSeconds { get; init; }
 
     /// <summary>Fail-safe max duration, in seconds.</summary>
     [DomainSetting(Kind = DomainSettingValueKind.Int, RuntimeOverlay = true, Group = "TTL", DisplayName = "Fusion fail-safe (seconds)")]
-    public int? FailSafeSeconds { get; set; }
+    public int? FailSafeSeconds { get; init; }
 
     /// <summary>Eager refresh threshold ratio (0–1 exclusive). 0 = disabled.</summary>
     [DomainSetting(Kind = DomainSettingValueKind.Double, RuntimeOverlay = true, Group = "Fusion", DisplayName = "Eager refresh ratio")]
-    public double? EagerRefreshRatio { get; set; }
+    public double? EagerRefreshRatio { get; init; }
 
     /// <summary>Max jitter added to Fusion duration, in seconds.</summary>
     [DomainSetting(Kind = DomainSettingValueKind.Int, RuntimeOverlay = true, Group = "Fusion", DisplayName = "Fusion jitter (seconds)")]
-    public int? JitterSeconds { get; set; }
+    public int? JitterSeconds { get; init; }
 
     /// <summary>Factory soft timeout, in seconds.</summary>
     [DomainSetting(Kind = DomainSettingValueKind.Int, RuntimeOverlay = true, Group = "Fusion", DisplayName = "Factory soft timeout (seconds)")]
-    public int? FactorySoftTimeoutSeconds { get; set; }
+    public int? FactorySoftTimeoutSeconds { get; init; }
 
     /// <summary>Factory hard timeout, in seconds.</summary>
     [DomainSetting(Kind = DomainSettingValueKind.Int, RuntimeOverlay = true, Group = "Fusion", DisplayName = "Factory hard timeout (seconds)")]
-    public int? FactoryHardTimeoutSeconds { get; set; }
+    public int? FactoryHardTimeoutSeconds { get; init; }
 
     /// <summary>Allow background distributed cache operations.</summary>
     [DomainSetting(Kind = DomainSettingValueKind.Bool, RuntimeOverlay = true, Group = "Fusion", DisplayName = "Background distributed ops")]
-    public bool? AllowBackgroundDistributed { get; set; }
+    public bool? AllowBackgroundDistributed { get; init; }
 
     /// <summary>Allow background backplane operations.</summary>
     [DomainSetting(Kind = DomainSettingValueKind.Bool, RuntimeOverlay = true, Group = "Fusion", DisplayName = "Background backplane ops")]
-    public bool? AllowBackgroundBackplane { get; set; }
+    public bool? AllowBackgroundBackplane { get; init; }
 }

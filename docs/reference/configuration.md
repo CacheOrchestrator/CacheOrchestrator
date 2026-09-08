@@ -321,6 +321,10 @@ Bound from `Cache:DomainDefaults:FusionCache` / `Cache:Domains:{name}:FusionCach
 
 `MaxItemBytes` and its runtime-overlay key were removed for 3.0. The beta setting assigned a fixed native cache weight; it never measured or limited payload bytes. Remove it from configuration (including a value of `0`); Fusion configuration validation rejects the old key. CacheOrchestrator exposes no replacement size setting or size-limit capability. Applications that require memory budgets must configure and own them through the underlying cache engine. The native [memory-cache size contract](https://learn.microsoft.com/en-us/aspnet/core/performance/caching/memory#use-setsize-size-and-sizelimit-to-limit-cache-size) uses application-defined units.
 
+## Resolved runtime snapshots
+
+Resolved `DomainCacheOptions`, `DomainHttpCacheOptions` and provider-returned `DomainFusionCacheSettings` are shared snapshots. Treat them as immutable: create a new value or use configuration/runtime management to change policy. HTTP collection properties expose `IReadOnlyList<T>` and copy input at initialization; they retain the difference between a null query allowlist (all eligible keys) and an empty one (no keys). Public collection reads do not clone data. Fusion settings use init-only scalar properties, which continue to support configuration binding. Custom providers and contributors must not mutate request tag collections or retain mutable sections in the runtime store.
+
 ## Admin API (`Cache:Admin`)
 
 Opt-in ops API on each application process. **Disabled by default** (no routes, no live counters).  

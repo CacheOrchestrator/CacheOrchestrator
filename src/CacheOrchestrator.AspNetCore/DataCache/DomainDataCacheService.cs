@@ -695,7 +695,7 @@ internal sealed class DomainDataCacheService : IDomainDataCache
         }
 
         CacheIdentityMaterial? material = await CacheIdentityApplicator
-            .BuildAsync(binding, http, opts, CacheVarySurface.Fusion, _logger, cancellationToken)
+            .BuildAsync(binding, http, opts, CacheVarySurface.DataCache, _logger, cancellationToken)
             .ConfigureAwait(false);
 
         if (material is null)

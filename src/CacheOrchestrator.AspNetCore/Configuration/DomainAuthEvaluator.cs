@@ -65,7 +65,7 @@ public static class DomainAuthEvaluator
         System.Security.Claims.ClaimsPrincipal? user = http.User;
         if (user?.Identity?.IsAuthenticated == true)
         {
-            string[]? claimTypes = options.VaryByAuthClaims;
+            string[]? claimTypes = options.VaryByAuthClaimsArray;
             if (claimTypes is { Length: > 0 })
             {
                 List<string> parts = new(claimTypes.Length);

@@ -87,7 +87,7 @@ The normalization lists do **not** negotiate a representation or enumerate every
 
 There is no inverse “Output Cache respects Data Cache” setting: Output Cache owns the request bypass through `AuthBypassMode`. `DataCacheRespectAuthBypass` only decides whether Data Cache follows the same signal.
 
-Fusion includes **auth-user** in the key only when `AuthBypassMode` is `Never` **or** `VaryByAuthClaims` is set (`ShouldIncludeAuthUserVary`). Output Cache still varies by `auth-user` whenever authenticated traffic is cached and `VaryOutputCacheByUser` is true.
+HTTP Data Cache includes **auth-user** in the key only when `AuthBypassMode` is `Never` **or** `VaryByAuthClaims` is set (`ShouldIncludeAuthUserVary`). Output Cache still varies by `auth-user` whenever authenticated traffic is cached and `VaryOutputCacheByUser` is true.
 
 ### `AuthBypassMode`
 
@@ -187,7 +187,7 @@ services.AddSingleton<ICacheVaryContributor, TenantVaryContributor>();
 | Value | Consumer |
 |-------|----------|
 | `CacheVarySurface.OutputCache` | ASP.NET Core Output Cache vary values |
-| `CacheVarySurface.Fusion` | HTTP Data Cache key material |
+| `CacheVarySurface.DataCache` | HTTP Data Cache key material |
 
 Most contributors should add the same dimension to both surfaces, as the example does. Branch on `Surface` only when the payload or sharing boundary genuinely differs; otherwise the two layers can disagree about request identity.
 
