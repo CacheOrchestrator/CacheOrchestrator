@@ -92,7 +92,7 @@ internal sealed class FusionCacheConfigurationValidator : IValidateOptions<Cache
         }
     }
 
-    private static void ValidateEffective(
+    internal static void ValidateEffective(
         string label,
         DomainFusionCacheSettings settings,
         int dataCacheTtlSeconds,

@@ -87,6 +87,41 @@ public sealed class HttpDomainOptionsReloadTests
             await slow;
         }
     }
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ConcurrentMutation_RetriesMixedCoreAndHttpSnapshot(bool clearAfterChange)
+    {
+        var state = new DomainRuntimeOverrideStore();
+        TestMonitor<CacheOrchestratorOptions> coreMonitor = new();
+        TestMonitor<CacheOrchestratorHttpOptions> httpMonitor = new() { Read = () => new() };
+        IDomainCacheOptionsProvider coreProvider = Substitute.For<IDomainCacheOptionsProvider>();
+        int reads = 0;
+        coreProvider.GetOrCreateDomainOptions("catalog").Returns(_ =>
+        {
+            DomainCacheOptions captured = new() { Domain = "catalog", Version = state.Get("catalog")?.Version ?? "old" };
+            if (Interlocked.Increment(ref reads) == 1)
+            {
+                state.Update("catalog", context =>
+                {
+                    context.Set(new DomainRuntimeOverride { Version = "new", Stamp = context.Stamp });
+                    context.Set(new HttpDomainRuntimeOverride { OutputCacheTtl = TimeSpan.FromSeconds(120), Stamp = context.Stamp });
+                });
+                if (clearAfterChange)
+                    state.Clear("catalog");
+            }
+            return captured;
+        });
+        using var provider = new RequestDomainCacheOptionsProvider(
+            coreProvider, coreMonitor, httpMonitor, NullLogger<RequestDomainCacheOptionsProvider>.Instance,
+            state, new HttpDomainRuntimeOverrideStore(state));
+        DomainHttpCacheOptions resolved = provider.GetOrCreateDomainOptions("catalog");
+        reads.Should().Be(2);
+        resolved.Version.Should().Be(clearAfterChange ? "old" : "new");
+        resolved.OutputTtl.Should().Be(TimeSpan.FromSeconds(clearAfterChange ? 3700 : 120));
+        provider.GetOrCreateDomainOptions("catalog").Should().BeSameAs(resolved);
+    }
+
     private sealed class TestMonitor<T> : IOptionsMonitor<T> where T : class
     {
         public Func<T> Read { get; set; } = () => throw new InvalidOperationException("No read configured.");

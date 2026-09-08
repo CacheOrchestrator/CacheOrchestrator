@@ -158,3 +158,11 @@ Output Cache and Data Cache providers can differ (for example, InMemory Output C
 ### Provider materialization contract
 
 `IDataCacheProvider.GetOrCreateWithTagsAsync` selects complete tags from each newly produced value before publishing that materialization. The selector is not a hit-time operation. Providers must apply this to background refresh as well as foreground misses; implementing it with a post-return `SetAsync` permits stale overwrites and loses background tags. Fusion uses its factory execution context. Hybrid publishes a unique tagged validity marker first and persists the marker key and tags with the payload, validating it on footprint hits. Ordinary provider lookups retain their direct path.
+
+### Atomic runtime settings
+
+`IDomainRuntimeOverrideStore` owns one immutable set of typed sections per domain. Its `Update` callback receives a private `DomainSettingsPatchContext`; it serializes writers to that domain and publishes one revision after the callback succeeds. Exceptions discard the working copy. Cache reads require only dictionary and volatile-reference reads. Clearing advances the revision to prevent an update/clear race from looking unchanged.
+
+Package implementations of `IDomainSettingsPatchContributor` must implement `Prepare` and `Validate`. Prepare parses owned keys and stages an immutable merged section with `context.Set`; Validate runs after all packages have prepared and checks the effective combination, including unchanged fields and dependent Core settings. Both phases must avoid external side effects and nested store mutations. Consumers retrieve their immutable section with `GetSettings<T>`. Low-level `Update` callers own validation; the management/cluster applicator performs package validation for wire patches. Never mutate a returned section or retain a working context.
+
+This replaces the beta contributor `Apply` contract: custom contributors and custom stores must adopt atomic preparation/publication before sharing the 3.0 runtime. The HTTP snapshot resolver detects a publication between its Core and HTTP reads and retries construction; an unstable domain is rejected after bounded retries rather than exposing a mixed revision.

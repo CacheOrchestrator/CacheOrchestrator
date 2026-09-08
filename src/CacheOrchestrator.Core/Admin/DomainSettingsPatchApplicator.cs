@@ -28,14 +28,22 @@ internal static class DomainSettingsPatchApplicator
         Dictionary<string, JsonElement> core = new(StringComparer.OrdinalIgnoreCase);
         Dictionary<IDomainSettingsPatchContributor, Dictionary<string, JsonElement>> byContributor = new();
 
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
         foreach ((string rawKey, JsonElement el) in settings)
         {
             DomainSettingCatalogEntry entry = DomainSettingCatalog.Find(rawKey)
                 ?? throw new ArgumentException($"Unknown domain setting '{rawKey}'.", nameof(settings));
+            if (!seen.Add(entry.Id))
+                throw new ArgumentException($"Setting '{entry.Id}' was supplied more than once through different aliases.", nameof(settings));
             if (!entry.RuntimeOverlay)
                 throw new ArgumentException($"Setting '{entry.Id}' is not runtime-patchable.", nameof(settings));
 
-            IDomainSettingsPatchContributor? owner = contribs.FirstOrDefault(c => c.Owns(entry.Id));
+            IDomainSettingsPatchContributor[] owners = contribs.Where(c => c.Owns(entry.Id)).ToArray();
+            if (owners.Length != 0 && entry.Id is "dataCache.enabled" or "dataCache.ttlSeconds")
+                throw new ArgumentException($"Setting '{entry.Id}' is owned by Core.", nameof(settings));
+            if (owners.Length > 1)
+                throw new ArgumentException($"Multiple contributors own setting '{entry.Id}'.", nameof(settings));
+            IDomainSettingsPatchContributor? owner = owners.FirstOrDefault();
             if (owner is not null)
             {
                 if (!byContributor.TryGetValue(owner, out Dictionary<string, JsonElement>? bag))
@@ -51,19 +59,16 @@ internal static class DomainSettingsPatchApplicator
             core[entry.Id] = el;
         }
 
-        DomainSettingsPatch patch = new();
-        if (core.Count > 0)
+        DomainSettingsPatch patch = core.Count > 0 ? DomainSettingsPatchMapper.FromDictionary(core) : new();
+        store.Update(domain, context =>
         {
-            patch = DomainSettingsPatchMapper.FromDictionary(core);
-            store.PatchSettings(domain, patch);
-        }
-
-        foreach ((IDomainSettingsPatchContributor contributor, Dictionary<string, JsonElement> bag) in byContributor)
-            contributor.Apply(domain, bag);
-
-        if (core.Count == 0 && byContributor.Count == 0)
-            throw new ArgumentException("At least one setting must be set.", nameof(settings));
-
+            if (patch.HasAny)
+                context.Set(DomainRuntimeOverrideStore.Merge(context.Get<DomainRuntimeOverride>() ?? new(), patch, context.Stamp));
+            foreach ((IDomainSettingsPatchContributor contributor, Dictionary<string, JsonElement> bag) in byContributor)
+                contributor.Prepare(context, bag);
+            foreach (IDomainSettingsPatchContributor contributor in contribs)
+                contributor.Validate(context);
+        });
         return patch;
     }
 }

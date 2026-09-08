@@ -70,3 +70,14 @@ CacheOrchestrator.Orchestration.IDataCacheProviderCapabilities.Capabilities.get 
 *REMOVED*CacheOrchestrator.Orchestration.ICacheOrchestrator.GetOrCreateEntityAsync<T>(string! domain, string! logicalKey, CacheOrchestrator.Entity.EntityRef primary, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T?>>! factory, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T?>
 *REMOVED*CacheOrchestrator.Orchestration.ICacheOrchestrator.GetOrCreateEntitySetAsync<T>(string! domain, string! logicalKey, string! entityKind, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<CacheOrchestrator.Entity.EntitySet<T>!>>! factory, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Collections.Generic.IReadOnlyList<T>!>
 CacheOrchestrator.Orchestration.IDataCacheProvider.GetOrCreateWithTagsAsync<T>(CacheOrchestrator.Orchestration.DataCacheProviderRequest! request, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! factory, System.Func<T, System.Collections.Generic.IReadOnlyList<string!>!>! tagSelector, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<CacheOrchestrator.Orchestration.DataCacheProviderResult<T>>
+CacheOrchestrator.Admin.DomainSettingsPatchContext
+CacheOrchestrator.Admin.IDomainSettingsPatchContributor.Prepare(CacheOrchestrator.Admin.DomainSettingsPatchContext! context, System.Collections.Generic.IReadOnlyDictionary<string!, System.Text.Json.JsonElement>! settings) -> void
+CacheOrchestrator.Admin.IDomainRuntimeOverrideStore.GetSettings<T>(string! domain) -> T?
+CacheOrchestrator.Admin.IDomainRuntimeOverrideStore.Update(string! domain, System.Action<CacheOrchestrator.Admin.DomainSettingsPatchContext!>! prepare) -> void
+CacheOrchestrator.Admin.DomainSettingsPatchContext.Domain.get -> string!
+CacheOrchestrator.Admin.DomainSettingsPatchContext.Stamp.get -> int
+CacheOrchestrator.Admin.DomainSettingsPatchContext.Get<T>() -> T?
+CacheOrchestrator.Admin.DomainSettingsPatchContext.Set<T>(T! settings) -> void
+*REMOVED*CacheOrchestrator.Admin.IDomainSettingsPatchContributor.Apply(string! domain, System.Collections.Generic.IReadOnlyDictionary<string!, System.Text.Json.JsonElement>! settings) -> void
+CacheOrchestrator.Admin.DomainSettingsPatchContext.Remove<T>() -> bool
+CacheOrchestrator.Admin.IDomainSettingsPatchContributor.Validate(CacheOrchestrator.Admin.DomainSettingsPatchContext! context) -> void

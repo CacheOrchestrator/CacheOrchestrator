@@ -12,8 +12,12 @@ public interface IDomainSettingsPatchContributor
     bool Owns(string settingId);
 
     /// <summary>
-    /// Applies a batch of owned overlay settings for <paramref name="domain"/>.
+    /// Validates and stages owned overlay settings in the unpublished working copy.
+    /// Throw on invalid effective settings. Do not mutate a store or perform external side effects.
     /// Only keys for which <see cref="Owns"/> is true should be present.
     /// </summary>
-    void Apply(string domain, IReadOnlyDictionary<string, JsonElement> settings);
+    void Prepare(DomainSettingsPatchContext context, IReadOnlyDictionary<string, JsonElement> settings);
+
+    /// <summary>Validates the effective state after every contributor has prepared its section.</summary>
+    void Validate(DomainSettingsPatchContext context);
 }

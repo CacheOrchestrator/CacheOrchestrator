@@ -117,7 +117,7 @@ public class AdminRegistrationTests
         versionResult.Effective.VersionIsRuntimeOverride.Should().BeTrue();
 
         using StringContent settingsBody = new(
-            """{"settings":{"outputCache.ttlSeconds":42,"clientCache.ttlSeconds":7}}""",
+            """{"settings":{"outputCache.ttlSeconds":42,"clientCache.ttlSeconds":7,"clientCache.ttlMinSeconds":5}}""",
             Encoding.UTF8,
             "application/json");
         HttpRequestMessage settingsRequest = new(HttpMethod.Patch, "/cache-admin/local/domains/catalog/settings")

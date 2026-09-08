@@ -73,14 +73,27 @@ internal sealed class RequestDomainCacheOptionsProvider : IRequestDomainCacheOpt
             return cached.Options;
         }
 
-        DomainHttpCacheOptions options = CreateDomainOptions(normalized);
-        generation[normalized] = new CachedHttpOptions
+        // A mutation may publish between Core and HTTP reads. Retry construction, never cache
+        // or return a combination assembled from different runtime revisions.
+        for (int attempt = 0; attempt < 8; attempt++)
         {
-            Options = options,
-            CoreOverrideStamp = coreStamp,
-            HttpOverrideStamp = httpStamp
-        };
-        return options;
+            DomainHttpCacheOptions options = CreateDomainOptions(normalized);
+            int currentCoreStamp = _coreRuntimeOverrides.GetStamp(normalized);
+            int currentHttpStamp = _httpRuntimeOverrides.GetStamp(normalized);
+            if (currentCoreStamp == coreStamp && currentHttpStamp == httpStamp)
+            {
+                generation[normalized] = new CachedHttpOptions
+                {
+                    Options = options,
+                    CoreOverrideStamp = coreStamp,
+                    HttpOverrideStamp = httpStamp
+                };
+                return options;
+            }
+            coreStamp = currentCoreStamp;
+            httpStamp = currentHttpStamp;
+        }
+        throw new InvalidOperationException($"Runtime settings for domain '{normalized}' changed repeatedly during snapshot construction.");
     }
 
     public DomainHttpCacheOptions EnsureDomainOptions(HttpContext http, string domain)

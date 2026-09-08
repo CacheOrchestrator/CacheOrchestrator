@@ -1,5 +1,5 @@
 using CacheOrchestrator.Admin;
-using System.Collections.Concurrent;
+using Microsoft.Extensions.Options;
 using System.Globalization;
 using System.Text.Json;
 
@@ -47,24 +47,23 @@ internal interface IHttpDomainRuntimeOverrideStore
 
 internal sealed class HttpDomainRuntimeOverrideStore : IHttpDomainRuntimeOverrideStore
 {
-    private readonly ConcurrentDictionary<string, HttpDomainRuntimeOverride> _overrides = new(StringComparer.Ordinal);
-    private int _stamp;
-
-    public HttpDomainRuntimeOverride? Get(string domain) =>
-        _overrides.TryGetValue(DomainName.Normalize(domain), out HttpDomainRuntimeOverride? value) ? value : null;
-
-    public int GetStamp(string domain) => Get(domain)?.Stamp ?? 0;
-
-    public void Patch(string domain, HttpDomainRuntimeOverride patch)
+    private readonly IDomainRuntimeOverrideStore _state;
+    public HttpDomainRuntimeOverrideStore() : this(new DomainRuntimeOverrideStore()) { }
+    public HttpDomainRuntimeOverrideStore(IDomainRuntimeOverrideStore state)
     {
-        string key = DomainName.Normalize(domain);
-        _overrides.AddOrUpdate(key, _ => patch with { Stamp = NextStamp() }, (_, current) => Merge(current, patch));
+        _state = state;
     }
 
-    private HttpDomainRuntimeOverride Merge(HttpDomainRuntimeOverride current, HttpDomainRuntimeOverride patch) =>
+    public HttpDomainRuntimeOverride? Get(string domain) => _state.GetSettings<HttpDomainRuntimeOverride>(domain);
+    public int GetStamp(string domain) => _state.GetStamp(domain);
+
+    public void Patch(string domain, HttpDomainRuntimeOverride patch) =>
+        _state.Update(domain, context => context.Set(Merge(context.Get<HttpDomainRuntimeOverride>() ?? new(), patch, context.Stamp)));
+
+    internal static HttpDomainRuntimeOverride Merge(HttpDomainRuntimeOverride current, HttpDomainRuntimeOverride patch, int stamp) =>
         patch with
         {
-            Stamp = NextStamp(),
+            Stamp = stamp,
             OutputCacheEnabled = patch.OutputCacheEnabled ?? current.OutputCacheEnabled,
             AuthBypassMode = patch.AuthBypassMode ?? current.AuthBypassMode,
             VaryOutputCacheByUser = patch.VaryOutputCacheByUser ?? current.VaryOutputCacheByUser,
@@ -95,25 +94,28 @@ internal sealed class HttpDomainRuntimeOverrideStore : IHttpDomainRuntimeOverrid
             OutputCacheVaryByHost = patch.OutputCacheVaryByHost ?? current.OutputCacheVaryByHost
         };
 
-    private int NextStamp() => Interlocked.Increment(ref _stamp);
 }
 
 internal sealed class HttpDomainSettingsPatchContributor : IDomainSettingsPatchContributor
 {
-    private readonly IHttpDomainRuntimeOverrideStore _store;
+    private readonly IOptionsMonitor<CacheOrchestratorHttpOptions> _options;
 
-    public HttpDomainSettingsPatchContributor(IHttpDomainRuntimeOverrideStore store)
+    public HttpDomainSettingsPatchContributor(IOptionsMonitor<CacheOrchestratorHttpOptions> options)
     {
-        ArgumentNullException.ThrowIfNull(store);
-        _store = store;
+        _options = options;
     }
 
-    public bool Owns(string settingId) =>
-        !settingId.Equals("dataCache.enabled", StringComparison.OrdinalIgnoreCase)
-        && !settingId.Equals("dataCache.ttlSeconds", StringComparison.OrdinalIgnoreCase)
-        && !settingId.StartsWith("fusionCache.", StringComparison.OrdinalIgnoreCase);
+    public bool Owns(string settingId) => settingId is
+        "outputCache.enabled" or "authBypassMode" or "varyOutputCacheByUser" or
+        "treatAuthorizationAsAuthSignal" or "authVaryIncludeAuthorizationHash" or "dataCacheRespectAuthBypass" or
+        "clientCache.forcePrivateWhenAuthenticated" or "varyByAccept" or "varyByAcceptLanguage" or "emitResponseVary" or
+        "acceptNormalizationList" or "acceptLanguageNormalizationList" or "varyByHeaders" or "varyByQueryKeys" or
+        "ignoreQueryKeys" or "varyByCookies" or "varyByAuthClaims" or "outputCache.eTagMode" or
+        "clientCache.cacheability" or "clientCache.ttlSeconds" or "clientCache.ttlMinSeconds" or
+        "clientCache.scheduledUpdateUtc" or "clientCache.mustRevalidateNearUpdate" or "outputCache.ttlSeconds" or
+        "dataCache.respectNoStore" or "dataCache.varyOnPublicAddress" or "dataCache.varyOnEncoding" or "outputCache.varyByHost";
 
-    public void Apply(string domain, IReadOnlyDictionary<string, JsonElement> settings)
+    public void Prepare(DomainSettingsPatchContext context, IReadOnlyDictionary<string, JsonElement> settings)
     {
         HttpDomainRuntimeOverride patch = new();
         foreach ((string id, JsonElement value) in settings)
@@ -152,9 +154,19 @@ internal sealed class HttpDomainSettingsPatchContributor : IDomainSettingsPatchC
             };
         }
 
-        if (patch.ClientTtl is TimeSpan max && patch.ClientTtlMin is TimeSpan min && min > max)
-            throw new ArgumentException("clientCache.ttlMinSeconds must be <= clientCache.ttlSeconds.", nameof(settings));
-        _store.Patch(domain, patch);
+        HttpDomainRuntimeOverride merged = HttpDomainRuntimeOverrideStore.Merge(context.Get<HttpDomainRuntimeOverride>() ?? new(), patch, context.Stamp);
+        context.Set(merged);
+    }
+
+    public void Validate(DomainSettingsPatchContext context)
+    {
+        HttpDomainRuntimeOverride merged = context.Get<HttpDomainRuntimeOverride>() ?? new();
+        CacheOrchestratorHttpOptions options = _options.CurrentValue;
+        options.Domains.TryGetValue(context.Domain, out DomainHttpCacheSettings? specific);
+        double max = merged.ClientTtl?.TotalSeconds ?? specific?.ClientCache?.TtlSeconds ?? options.DomainDefaults.ClientCache?.TtlSeconds ?? 3600;
+        double min = merged.ClientTtlMin?.TotalSeconds ?? specific?.ClientCache?.TtlMinSeconds ?? options.DomainDefaults.ClientCache?.TtlMinSeconds ?? 60;
+        if (max > 0 && min > max)
+            throw new ArgumentException("clientCache.ttlMinSeconds must be <= effective clientCache.ttlSeconds.");
     }
 
     private static bool ReadBool(JsonElement value, string id) => value.ValueKind switch
@@ -179,7 +191,7 @@ internal sealed class HttpDomainSettingsPatchContributor : IDomainSettingsPatchC
     }
 
     private static T ReadEnum<T>(JsonElement value, string id) where T : struct, Enum =>
-        value.ValueKind == JsonValueKind.String && Enum.TryParse(value.GetString(), true, out T result)
+        value.ValueKind == JsonValueKind.String && Enum.TryParse(value.GetString(), true, out T result) && Enum.IsDefined(result)
             ? result
             : throw new ArgumentException($"Setting '{id}' must be one of: {string.Join(", ", Enum.GetNames<T>())}.", id);
 
