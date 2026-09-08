@@ -12,7 +12,8 @@ public class FusionDomainSettingCatalogTests
         ServiceCollection services = new();
         services.AddCacheOrchestratorFusionCache();
 
-        IReadOnlyList<DomainSettingCatalogEntry> all = DomainSettingCatalog.GetEntries();
+        using ServiceProvider provider = services.BuildServiceProvider();
+        IReadOnlyList<DomainSettingCatalogEntry> all = provider.GetRequiredService<DomainSettingCatalog>().GetEntries();
         Assert.Contains(all, e => e.Id == "fusionCache.hardTtlSeconds" && e.RuntimeOverlay);
         Assert.Contains(all, e => e.Id == "fusionCache.failSafeSeconds" && e.RuntimeOverlay);
         Assert.Contains(all, e => e.Id == "fusionCache.eagerRefreshRatio" && e.RuntimeOverlay);

@@ -99,3 +99,11 @@ CacheOrchestrator.Cluster.ClusterCommandResult.Errors.get -> System.Collections.
 CacheOrchestrator.Cluster.ClusterCommandResult.Invalidation.get -> CacheOrchestrator.Invalidation.CacheInvalidationResult?
 CacheOrchestrator.Cluster.ClusterCommandResult.Errors.init -> void
 *REMOVED*CacheOrchestrator.Cluster.IClusterCommandHandler.ApplyLocalAsync(CacheOrchestrator.Cluster.ClusterCommand! command, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+static CacheOrchestrator.Configuration.DomainSettingCatalog.RegisterSection(Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Type! settingsType, string! idPrefix, string! propertyPrefix) -> void
+CacheOrchestrator.Configuration.DomainSettingCatalog.GetEntries() -> System.Collections.Generic.IReadOnlyList<CacheOrchestrator.Configuration.DomainSettingCatalogEntry!>!
+CacheOrchestrator.Configuration.DomainSettingCatalog.GetOverlayEntries() -> System.Collections.Generic.IReadOnlyList<CacheOrchestrator.Configuration.DomainSettingCatalogEntry!>!
+CacheOrchestrator.Configuration.DomainSettingCatalog.Find(string? id) -> CacheOrchestrator.Configuration.DomainSettingCatalogEntry?
+*REMOVED*static CacheOrchestrator.Configuration.DomainSettingCatalog.Find(string? id) -> CacheOrchestrator.Configuration.DomainSettingCatalogEntry?
+*REMOVED*static CacheOrchestrator.Configuration.DomainSettingCatalog.GetEntries() -> System.Collections.Generic.IReadOnlyList<CacheOrchestrator.Configuration.DomainSettingCatalogEntry!>!
+*REMOVED*static CacheOrchestrator.Configuration.DomainSettingCatalog.GetOverlayEntries() -> System.Collections.Generic.IReadOnlyList<CacheOrchestrator.Configuration.DomainSettingCatalogEntry!>!
+*REMOVED*static CacheOrchestrator.Configuration.DomainSettingCatalog.RegisterSection(System.Type! settingsType, string! idPrefix, string! propertyPrefix) -> void

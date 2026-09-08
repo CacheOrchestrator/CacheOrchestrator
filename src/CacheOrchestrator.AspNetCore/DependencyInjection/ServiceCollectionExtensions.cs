@@ -55,7 +55,7 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        RegisterHttpDomainSettingCatalog();
+        RegisterHttpDomainSettingCatalog(services);
 
         // Backend registrars and options monitors resolve IConfiguration from DI.
         // Host builders usually register it; bare ServiceCollection unit tests do not.
@@ -139,12 +139,12 @@ public static class ServiceCollectionExtensions
         services.AddHostedService<CacheIdentityResolutionHostedService>();
     }
 
-    private static void RegisterHttpDomainSettingCatalog()
+    private static void RegisterHttpDomainSettingCatalog(IServiceCollection services)
     {
-        DomainSettingCatalog.RegisterSection(typeof(DomainHttpCacheSettings), "", "");
-        DomainSettingCatalog.RegisterSection(typeof(DomainHttpDataCacheSettings), "dataCache", "DataCache");
-        DomainSettingCatalog.RegisterSection(typeof(DomainOutputCacheSettings), "outputCache", "OutputCache");
-        DomainSettingCatalog.RegisterSection(typeof(DomainClientCacheSettings), "clientCache", "ClientCache");
+        DomainSettingCatalog.RegisterSection(services, typeof(DomainHttpCacheSettings), "", "");
+        DomainSettingCatalog.RegisterSection(services, typeof(DomainHttpDataCacheSettings), "dataCache", "DataCache");
+        DomainSettingCatalog.RegisterSection(services, typeof(DomainOutputCacheSettings), "outputCache", "OutputCache");
+        DomainSettingCatalog.RegisterSection(services, typeof(DomainClientCacheSettings), "clientCache", "ClientCache");
     }
 
     private static void RegisterAdminServices(

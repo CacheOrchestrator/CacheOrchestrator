@@ -13,8 +13,10 @@ internal sealed class DomainSettingsInvalidationCoordinator(
     IDomainCacheOptionsProvider domainOptions,
     IHttpCacheInvalidationSink outputCache,
     IEnumerable<IDomainSettingsInvalidationObserver> observers,
-    ILogger<DomainSettingsInvalidationCoordinator> logger)
+    ILogger<DomainSettingsInvalidationCoordinator> logger,
+    DomainSettingCatalog? catalog = null)
 {
+    private readonly DomainSettingCatalog _catalog = catalog ?? DomainSettingCatalog.Core;
     private readonly IDomainSettingValueProvider[] _valueProviders = [.. valueProviders];
     private readonly IDomainSettingsInvalidationObserver[] _observers = [.. observers];
 
@@ -41,15 +43,15 @@ internal sealed class DomainSettingsInvalidationCoordinator(
         {
             string[] ids = CanonicalizeSettingIds(settings.Keys);
             IReadOnlyDictionary<string, JsonElement> before = Capture(domain, ids);
-            DomainSettingsPatchApplicator.Apply(domain, settings, store, contributors);
+            DomainSettingsPatchApplicator.Apply(domain, settings, store, contributors, _catalog);
             IReadOnlyDictionary<string, JsonElement> after = Capture(domain, ids);
             DomainSettingsInvalidationTargets targets = DomainSettingsInvalidationPlanner.Plan(ids, before, after, applyImmediately);
             return new(domain, domainOptions.GetOrCreateDomainOptions(domain).DataCacheInstanceName, targets, _observers.Length);
         }
     }
 
-    public static string[] CanonicalizeSettingIds(IEnumerable<string> settingIds) =>
-        [.. settingIds.Select(static id => DomainSettingCatalog.Find(id)?.Id ?? id)
+    public string[] CanonicalizeSettingIds(IEnumerable<string> settingIds) =>
+        [.. settingIds.Select(id => _catalog.Find(id)?.Id ?? id)
             .Distinct(StringComparer.OrdinalIgnoreCase)];
 
     public IReadOnlyDictionary<string, JsonElement> Capture(string domain, IEnumerable<string> settingIds)

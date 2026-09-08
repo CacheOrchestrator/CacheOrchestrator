@@ -19,6 +19,7 @@ internal sealed class DefaultClusterCommandHandler : IClusterCommandHandler
     private readonly ClusterCommandDedupeStore _dedupe;
     private readonly IEnumerable<IDomainSettingsPatchContributor> _settingsContributors;
     private readonly ILogger<DefaultClusterCommandHandler> _logger;
+    private readonly DomainSettingCatalog _catalog;
     private readonly DomainSettingsInvalidationCoordinator? _settingsInvalidation;
 
     public DefaultClusterCommandHandler(
@@ -29,7 +30,8 @@ internal sealed class DefaultClusterCommandHandler : IClusterCommandHandler
         ClusterCommandDedupeStore dedupe,
         ILogger<DefaultClusterCommandHandler> logger,
         IEnumerable<IDomainSettingsPatchContributor>? settingsContributors = null,
-        DomainSettingsInvalidationCoordinator? settingsInvalidation = null)
+        DomainSettingsInvalidationCoordinator? settingsInvalidation = null,
+        DomainSettingCatalog? catalog = null)
     {
         ArgumentNullException.ThrowIfNull(invalidator);
         ArgumentNullException.ThrowIfNull(overrides);
@@ -46,6 +48,7 @@ internal sealed class DefaultClusterCommandHandler : IClusterCommandHandler
         _settingsContributors = settingsContributors ?? [];
         _logger = logger;
         _settingsInvalidation = settingsInvalidation;
+        _catalog = catalog ?? DomainSettingCatalog.Core;
     }
 
     /// <inheritdoc />
@@ -100,7 +103,7 @@ internal sealed class DefaultClusterCommandHandler : IClusterCommandHandler
                     ArgumentException.ThrowIfNullOrWhiteSpace(settings.Domain);
                     if (_settingsInvalidation is null)
                     {
-                        DomainSettingsPatchApplicator.Apply(settings.Domain, settings.Settings, _overrides, _settingsContributors);
+                        DomainSettingsPatchApplicator.Apply(settings.Domain, settings.Settings, _overrides, _settingsContributors, _catalog);
                         return new(ClusterCommandStatus.Applied, localMutationApplied: true);
                     }
                     DomainSettingsInvalidationPlan plan = _settingsInvalidation.ApplyPatch(

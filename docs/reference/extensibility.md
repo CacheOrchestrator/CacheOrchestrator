@@ -356,7 +356,7 @@ Do not then call `AddCacheOrchestratorFusionCache` or `AddCacheOrchestratorHybri
 A package can add settings to the Admin runtime catalog:
 
 1. Define a settings type whose properties use `DomainSettingAttribute`.
-2. Call `DomainSettingCatalog.RegisterSection(type, idPrefix, propertyPrefix)` during registration.
+2. Call `DomainSettingCatalog.RegisterSection(services, type, idPrefix, propertyPrefix)` during registration.
 3. Register an `IDomainSettingsPatchContributor` that owns and applies those setting IDs.
 
 ```csharp
@@ -368,7 +368,7 @@ public sealed class MyEngineDomainSettings
 
 // during package registration:
 DomainSettingCatalog.RegisterSection(
-    typeof(MyEngineDomainSettings),
+    builder.Services, typeof(MyEngineDomainSettings),
     idPrefix: "myEngine",
     propertyPrefix: "myEngine");
 
@@ -379,16 +379,31 @@ public sealed class MyEngineSettingsPatchContributor : IDomainSettingsPatchContr
     public bool Owns(string settingId) =>
         settingId.StartsWith("myEngine.", StringComparison.Ordinal);
 
-    public void Apply(string domain, IReadOnlyDictionary<string, JsonElement> settings)
+    public void Prepare(DomainSettingsPatchContext context, IReadOnlyDictionary<string, JsonElement> settings)
     {
-        // sparse merge into the process-local overlay store for this domain
+        MyEngineOverlay current = context.Get<MyEngineOverlay>() ?? new();
+        int seconds = settings["myEngine.softLimitSeconds"].GetInt32();
+        context.Set(current with { SoftLimitSeconds = seconds });
     }
+
+    public void Validate(DomainSettingsPatchContext context)
+    {
+        if (context.Get<MyEngineOverlay>()?.SoftLimitSeconds < 0)
+            throw new ArgumentException("SoftLimitSeconds must be non-negative.");
+    }
+}
+
+public sealed record MyEngineOverlay
+{
+    public int SoftLimitSeconds { get; init; }
 }
 ```
 
 FusionCache uses this mechanism for `fusionCache.hardTtlSeconds`, fail-safe, jitter, timeouts, and background-operation flags.
 
-`RuntimeOverlay = true` controls whether Admin PATCH accepts a setting. Contributors must validate values before mutating their process-local store and must treat a patch as a sparse merge. Distributed Admin changes carry the same setting dictionary through `SettingsPatchCommand`.
+`DomainSettingCatalog` is resolved from the host's DI container; its settings and aliases are built once from that service collection. Repeated identical registrations are idempotent, while conflicting setting aliases are rejected. Another host in the same process cannot change this catalog. Register every section before building the service provider.
+
+`RuntimeOverlay = true` controls whether Admin PATCH accepts a setting. Contributors prepare sparse, immutable typed sections, then validate the complete staged context before atomic publication. `Validate` also runs when another package owns every supplied key, so it must tolerate an absent own section. Distributed Admin changes carry the same setting dictionary through `SettingsPatchCommand`.
 
 ## Satellite-package builders
 

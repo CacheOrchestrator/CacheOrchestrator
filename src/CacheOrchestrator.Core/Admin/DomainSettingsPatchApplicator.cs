@@ -16,7 +16,8 @@ internal static class DomainSettingsPatchApplicator
         string domain,
         IReadOnlyDictionary<string, JsonElement> settings,
         IDomainRuntimeOverrideStore store,
-        IEnumerable<IDomainSettingsPatchContributor>? contributors = null)
+        IEnumerable<IDomainSettingsPatchContributor>? contributors = null,
+        DomainSettingCatalog? catalog = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(domain);
         ArgumentNullException.ThrowIfNull(settings);
@@ -31,7 +32,7 @@ internal static class DomainSettingsPatchApplicator
         HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
         foreach ((string rawKey, JsonElement el) in settings)
         {
-            DomainSettingCatalogEntry entry = DomainSettingCatalog.Find(rawKey)
+            DomainSettingCatalogEntry entry = (catalog ?? DomainSettingCatalog.Core).Find(rawKey)
                 ?? throw new ArgumentException($"Unknown domain setting '{rawKey}'.", nameof(settings));
             if (!seen.Add(entry.Id))
                 throw new ArgumentException($"Setting '{entry.Id}' was supplied more than once through different aliases.", nameof(settings));

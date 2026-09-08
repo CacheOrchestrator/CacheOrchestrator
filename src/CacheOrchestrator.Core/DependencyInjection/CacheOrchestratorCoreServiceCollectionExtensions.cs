@@ -63,6 +63,7 @@ public static class CacheOrchestratorCoreServiceCollectionExtensions
             }
         }
 
+        DomainSettingCatalog.Register(services);
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IDomainRuntimeOverrideStore, DomainRuntimeOverrideStore>();
         services.TryAddEnumerable(

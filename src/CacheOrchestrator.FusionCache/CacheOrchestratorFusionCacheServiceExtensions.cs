@@ -35,7 +35,7 @@ public static class CacheOrchestratorFusionCacheServiceExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         DomainSettingCatalog.RegisterSection(
-            typeof(DomainFusionCacheSettings),
+            services, typeof(DomainFusionCacheSettings),
             idPrefix: "fusionCache",
             propertyPrefix: "FusionCache");
 
