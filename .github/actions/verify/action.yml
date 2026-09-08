@@ -6,7 +6,7 @@ runs:
     - uses: actions/setup-dotnet@v5
       with:
         global-json-file: global.json
-        dotnet-version: 8.0.x
+        dotnet-version: 8.0.4xx
     - name: Build
       shell: pwsh
       run: ./eng/verify-release.ps1 -Phase Build

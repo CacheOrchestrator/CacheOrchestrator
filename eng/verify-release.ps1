@@ -3,7 +3,9 @@
 param(
     [ValidateSet('Inventory', 'Build', 'Tests', 'Pack', 'Consumers', 'All')]
     [string] $Phase = 'All',
-    [string] $Artifacts = '.artifacts/release'
+    [string] $Artifacts = '.artifacts/release',
+    [ValidateSet('All', '8', '10')]
+    [string] $ConsumerSdk = 'All'
 )
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
@@ -110,38 +112,51 @@ try {
         $version | Set-Content "$Artifacts/package-version.txt"
     }
     if ($Phase -in 'Consumers', 'All') {
-        # A fresh directory/cache plus source mapping proves that every product assembly
-        # came from these packages, even when another build has the same MinVer version.
-        $consumer = "$Artifacts/consumer-$([Guid]::NewGuid().ToString('N').Substring(0, 8))"
-        New-Item -ItemType Directory $consumer | Out-Null
-        Copy-Item "$PSScriptRoot/PackageConsumer/*" $consumer -Force
-        Copy-Item "$PSScriptRoot/PackageConsumer/.editorconfig" $consumer -Force
-        Copy-Item "$PSScriptRoot/ReleaseProjects.props" $consumer
-        # Compile the actual extension contract examples, not separately maintained copies.
-        $docs = Get-Content "$repo/docs/reference/extensibility.md" -Raw
-        foreach ($type in 'MyDataCacheProvider', 'MyEngineDomainSettings') {
-            $block = @([regex]::Matches($docs, '(?ms)^```csharp\s*\r?\n(.*?)^```') | Where-Object { $_.Groups[1].Value.Contains("public sealed class $type") })
-            if ($block.Count -ne 1) { throw "Expected one documented example for $type" }
-            $code = $block[0].Groups[1].Value
-            $code = $code.Substring($code.IndexOf("public sealed class $type"))
-            ("using CacheOrchestrator.Admin;`nusing CacheOrchestrator.Configuration;`nusing CacheOrchestrator.Orchestration;`nusing System.Text.Json;`n" + $code) |
-                Set-Content "$consumer/$type.cs"
-        }
-        $localFeed = [Security.SecurityElement]::Escape($packageDirectory)
-        @"
+        $sdks = if ($ConsumerSdk -eq 'All') { @('8', '10') } else { @($ConsumerSdk) }
+        foreach ($sdk in $sdks) {
+            # A fresh directory/cache plus source mapping proves that every product assembly
+            # came from these packages, even when another build has the same MinVer version.
+            $consumer = "$Artifacts/consumer-$sdk-$([Guid]::NewGuid().ToString('N').Substring(0, 8))"
+            New-Item -ItemType Directory $consumer | Out-Null
+            Copy-Item "$PSScriptRoot/PackageConsumer/*" $consumer -Force
+            Copy-Item "$PSScriptRoot/PackageConsumer/.editorconfig" $consumer -Force
+            Copy-Item "$PSScriptRoot/ReleaseProjects.props" $consumer
+            # Compile the actual extension contract examples, not separately maintained copies.
+            $docs = Get-Content "$repo/docs/reference/extensibility.md" -Raw
+            foreach ($type in 'MyDataCacheProvider', 'MyEngineDomainSettings') {
+                $block = @([regex]::Matches($docs, '(?ms)^```csharp\s*\r?\n(.*?)^```') | Where-Object { $_.Groups[1].Value.Contains("public sealed class $type") })
+                if ($block.Count -ne 1) { throw "Expected one documented example for $type" }
+                $code = $block[0].Groups[1].Value
+                $code = $code.Substring($code.IndexOf("public sealed class $type"))
+                ("using CacheOrchestrator.Admin;`nusing CacheOrchestrator.Configuration;`nusing CacheOrchestrator.Orchestration;`nusing System.Text.Json;`n" + $code) |
+                    Set-Content "$consumer/$type.cs"
+            }
+            $localFeed = [Security.SecurityElement]::Escape($packageDirectory)
+            @"
 <configuration>
   <packageSources><clear /><add key="local" value="$localFeed" /><add key="nuget" value="https://api.nuget.org/v3/index.json" /></packageSources>
   <packageSourceMapping><packageSource key="local"><package pattern="CacheOrchestrator*" /></packageSource><packageSource key="nuget"><package pattern="*" /></packageSource></packageSourceMapping>
 </configuration>
 "@ | Set-Content "$consumer/NuGet.Config"
-        $project = "$consumer/Consumer.csproj"
-        $property = "-p:SmokePackageVersion=$version"
-        Invoke-DotNet "$consumer/restore.log" @('restore', $project, $property, '--configfile', "$consumer/NuGet.Config", '--packages', "$consumer/cache")
-        Invoke-DotNet "$consumer/build.log" @('build', $project, '-c', 'Release', '--no-restore', $property)
-        foreach ($framework in 'net8.0', 'net10.0') {
-            Invoke-DotNet "$consumer/run-$framework.log" @("$consumer/bin/Release/$framework/Consumer.dll")
-        }
-        @'
+            $sdkPolicy = if ($sdk -eq '8') { "$consumer/global.net8.json" } else { "$repo/global.json" }
+            Copy-Item $sdkPolicy "$consumer/global.json"
+            $frameworks = if ($sdk -eq '8') { @('net8.0') } else { @('net8.0', 'net10.0') }
+            $frameworkProperty = "-p:SmokeNet8Only=$($sdk -eq '8')"
+            Push-Location $consumer
+            try {
+                Invoke-DotNet "$consumer/sdk.log" @('--version')
+                $selectedSdk = (Get-Content "$consumer/sdk.log" -Raw).Trim()
+                if (-not $selectedSdk.StartsWith("$sdk.", [StringComparison]::Ordinal)) {
+                    throw "Expected SDK $sdk for package consumer, got $selectedSdk"
+                }
+                $project = "$consumer/Consumer.csproj"
+                $property = "-p:SmokePackageVersion=$version"
+                Invoke-DotNet "$consumer/restore.log" @('restore', $project, $property, $frameworkProperty, '--configfile', "$consumer/NuGet.Config", '--packages', "$consumer/cache")
+                Invoke-DotNet "$consumer/build.log" @('build', $project, '-c', 'Release', '--no-restore', $property, $frameworkProperty)
+                foreach ($framework in $frameworks) {
+                    Invoke-DotNet "$consumer/run-$framework.log" @("$consumer/bin/Release/$framework/Consumer.dll")
+                }
+                @'
 public sealed class DuplicateIdentity
 {
     [CacheOrchestrator.Identity.CacheIdentity(new[] { "GET" }, "first")]
@@ -149,14 +164,17 @@ public sealed class DuplicateIdentity
     public void Execute() { }
 }
 '@ | Set-Content "$consumer/DuplicateIdentity.cs"
-        foreach ($framework in 'net8.0', 'net10.0') {
-            $log = "$consumer/analyzer-$framework.log"
-            & dotnet build $project -c Release --no-restore -f $framework $property *> $log
-            if ($LASTEXITCODE -eq 0 -or -not (Select-String -Path $log -Pattern 'error COIDENTITY001')) {
-                throw "Packaged analyzer did not reject duplicate identity on $framework; see $log"
+                foreach ($framework in $frameworks) {
+                    $log = "$consumer/analyzer-$framework.log"
+                    & dotnet build $project -c Release --no-restore -f $framework $property $frameworkProperty *> $log
+                    if ($LASTEXITCODE -eq 0 -or -not (Select-String -Path $log -Pattern 'error COIDENTITY001')) {
+                        throw "Packaged analyzer did not reject duplicate identity on $framework; see $log"
+                    }
+                }
+                Write-Output "Package consumers and analyzer positive/negative cases passed: SDK $selectedSdk, $($frameworks -join ', ')."
             }
+            finally { Pop-Location }
         }
-        Write-Output 'Package consumers and analyzer positive/negative cases passed on both TFMs.'
     }
 }
 finally { Pop-Location }

@@ -6,6 +6,8 @@
 
 Libraries target .NET 8 and .NET 10. Admin Console is a separate .NET 10 application. The [composition recipes](../how-to/composition.md) show complete registrations for web applications, HTTP-free workers, FusionCache, HybridCache, Redis and EF invalidation.
 
+For .NET 8 application builds using the packaged identity analyzer, use .NET SDK 8.0.400 or newer with Roslyn 4.11 or newer. Package-consumer checks exercise the 8.0.4xx servicing line with C# 12 and the .NET 10 SDK with both target frameworks. Building this repository itself uses the SDK policy in `global.json`.
+
 `CacheOrchestrator` is the web + FusionCache convenience package. For HybridCache, use the explicit ASP.NET Core composition with `AddHybridCache` and `AddCacheOrchestratorHybridCache`. Core owns HTTP-free `ICacheOrchestrator`; `IDomainDataCache` belongs to ASP.NET Core. HTTP policy is in `DomainHttpCacheOptions`, which contains the shared Core `DomainCacheOptions`.
 
 Configure engines under `DataCacheInstances` and select them with `DataCache.Instance`. Keep provider-specific Fusion settings under `FusionCache`. Cache durations in JSON use integer `*Seconds` properties. Redis leaf extension methods are in the `CacheOrchestrator.Redis` namespace even when only the corresponding leaf package is installed.
