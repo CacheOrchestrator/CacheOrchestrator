@@ -91,24 +91,21 @@ public sealed class CacheVaryMaterializer
         DomainHttpCacheOptions options,
         CacheVarySurface surface)
     {
-        IHeaderDictionary headers = http.Request.Headers;
-        if (headers.AcceptEncoding.Count > 0
-            && (surface == CacheVarySurface.OutputCache || options.DataCacheVaryOnEncoding))
-        {
+        // Configured header-vary dimensions always produce at least Response Vary names,
+        // even when the request omits the header (intermediate caches need the advertisement).
+        if (surface == CacheVarySurface.OutputCache || options.DataCacheVaryOnEncoding)
             return false;
-        }
 
-        if (options.VaryByAccept && headers.Accept.Count > 0)
+        if (options.VaryByAccept)
             return false;
-        if (options.VaryByAcceptLanguage && headers.AcceptLanguage.Count > 0)
+        if (options.VaryByAcceptLanguage)
             return false;
 
         if (options.VaryByHeaders is { Length: > 0 } varyHeaders)
         {
             for (int i = 0; i < varyHeaders.Length; i++)
             {
-                string? name = varyHeaders[i];
-                if (!string.IsNullOrWhiteSpace(name) && headers.ContainsKey(name.Trim()))
+                if (!string.IsNullOrWhiteSpace(varyHeaders[i]))
                     return false;
             }
         }
@@ -140,21 +137,29 @@ public sealed class CacheVaryMaterializer
         CacheVarySurface surface,
         Builder builder)
     {
-        // Accept-Encoding: OC always varies when present (historical). Fusion when DataCacheVaryOnEncoding.
+        // Accept-Encoding: OC always varies (historical). Fusion when DataCacheVaryOnEncoding.
+        // Advertise Vary even when the request omits the header so intermediates do not pin a default.
+        bool considerEncoding = surface == CacheVarySurface.OutputCache || options.DataCacheVaryOnEncoding;
         StringValues ae = http.Request.Headers.AcceptEncoding;
-        if (ae.Count > 0
-            && (surface == CacheVarySurface.OutputCache || options.DataCacheVaryOnEncoding))
+        if (considerEncoding)
         {
-            if (options.EncodingNormalizationList is { Length: > 0 } encodingNormalization)
+            if (ae.Count > 0)
             {
-                builder.AddNormalizedHeader(
-                    HeaderNames.AcceptEncoding,
-                    "normalized:accept-encoding",
-                    HttpHelper.ResolvePreferredHeader(ae, encodingNormalization, languageRange: false));
+                if (options.EncodingNormalizationList is { Length: > 0 } encodingNormalization)
+                {
+                    builder.AddNormalizedHeader(
+                        HeaderNames.AcceptEncoding,
+                        "normalized:accept-encoding",
+                        HttpHelper.NormalizeNegotiationHeader(ae, encodingNormalization));
+                }
+                else
+                {
+                    builder.AddHeader(HeaderNames.AcceptEncoding);
+                }
             }
             else
             {
-                builder.AddHeader(HeaderNames.AcceptEncoding);
+                builder.AdvertiseResponseHeader(HeaderNames.AcceptEncoding);
             }
         }
 
@@ -168,12 +173,16 @@ public sealed class CacheVaryMaterializer
                     builder.AddNormalizedHeader(
                         HeaderNames.Accept,
                         "normalized:accept",
-                        HttpHelper.ResolvePreferredHeader(accept, acceptNormalization, languageRange: false));
+                        HttpHelper.NormalizeNegotiationHeader(accept, acceptNormalization));
                 }
                 else
                 {
                     builder.AddHeader(HeaderNames.Accept);
                 }
+            }
+            else
+            {
+                builder.AdvertiseResponseHeader(HeaderNames.Accept);
             }
         }
 
@@ -187,12 +196,16 @@ public sealed class CacheVaryMaterializer
                     builder.AddNormalizedHeader(
                         HeaderNames.AcceptLanguage,
                         "normalized:accept-language",
-                        HttpHelper.ResolvePreferredHeader(al, languageNormalization, languageRange: true));
+                        HttpHelper.NormalizeNegotiationHeader(al, languageNormalization));
                 }
                 else
                 {
                     builder.AddHeader(HeaderNames.AcceptLanguage);
                 }
+            }
+            else
+            {
+                builder.AdvertiseResponseHeader(HeaderNames.AcceptLanguage);
             }
         }
 
@@ -206,7 +219,13 @@ public sealed class CacheVaryMaterializer
                     continue;
                 name = name.Trim();
                 if (!http.Request.Headers.ContainsKey(name))
+                {
+                    // Non-sensitive configured headers must still appear in response Vary.
+                    if (!IsSensitiveHeader(name))
+                        builder.AdvertiseResponseHeader(name);
                     continue;
+                }
+
                 builder.AddHeader(name);
             }
         }
@@ -451,8 +470,19 @@ public sealed class CacheVaryMaterializer
             AddResponseVaryHeader(headerName);
         }
 
+        /// <summary>
+        /// Advertises a response <c>Vary</c> token without adding key material
+        /// (used when the request omits a configured vary header).
+        /// </summary>
+        public void AdvertiseResponseHeader(string headerName) =>
+            AddResponseVaryHeader(headerName);
+
         private void AddResponseVaryHeader(string headerName)
         {
+            if (string.IsNullOrWhiteSpace(headerName))
+                return;
+            headerName = headerName.Trim();
+
             if (_responseVary is not null)
             {
                 for (int i = 0; i < _responseVary.Count; i++)

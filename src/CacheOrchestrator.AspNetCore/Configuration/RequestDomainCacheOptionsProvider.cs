@@ -11,8 +11,6 @@ namespace CacheOrchestrator.Configuration;
 /// </summary>
 internal sealed class RequestDomainCacheOptionsProvider : IRequestDomainCacheOptions, IDisposable
 {
-    private static readonly string[] DefaultAcceptNormalization = ["application/json", "application/xml"];
-
     private readonly IDomainCacheOptionsProvider _coreOptions;
     private readonly IOptionsMonitor<CacheOrchestratorOptions> _coreOptionsMonitor;
     private readonly IOptionsMonitor<CacheOrchestratorHttpOptions> _httpOptionsMonitor;
@@ -160,10 +158,11 @@ internal sealed class RequestDomainCacheOptionsProvider : IRequestDomainCacheOpt
                     true),
             VaryByAccept = overlay?.VaryByAccept
                 ?? Pick(domainSettings.VaryByAccept, defaults.VaryByAccept, true),
+            // Raw Accept is the default. Configured tokens may canonicalize spelling, never
+            // select a formatter or discard other negotiation information.
             AcceptNormalizationList = Copy(overlay?.AcceptNormalizationList
                 ?? domainSettings.AcceptNormalizationList
-                ?? defaults.AcceptNormalizationList
-                ?? DefaultAcceptNormalization),
+                ?? defaults.AcceptNormalizationList),
             VaryByAcceptLanguage = overlay?.VaryByAcceptLanguage
                 ?? Pick(domainSettings.VaryByAcceptLanguage, defaults.VaryByAcceptLanguage, false),
             AcceptLanguageNormalizationList = Copy(overlay?.AcceptLanguageNormalizationList

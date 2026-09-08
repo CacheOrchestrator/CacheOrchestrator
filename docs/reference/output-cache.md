@@ -183,7 +183,7 @@ The following examples are domain entries placed under `Cache:Domains`.
 }
 ```
 
-Alice and Bob both call `GET /api/me/summary`. The server stores two entries (`auth-user=u:alice` and `u:bob`). The browser may cache privately for 60 seconds. A shared CDN must not treat the response as public.
+Alice and Bob both call `GET /api/me/summary`. With no `VaryByAuthClaims`, the server stores two entries from the authenticated identity name (`auth-user=u:alice` and `u:bob`). If you set `VaryByAuthClaims`, include a per-user claim (for example `sub`) — a tenant-only list shares one entry across users. The browser may cache privately for 60 seconds. A shared CDN must not treat the response as public.
 
 **Public tiles with an API key (one shared entry):**
 

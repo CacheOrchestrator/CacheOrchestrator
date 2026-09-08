@@ -54,16 +54,16 @@ public class HttpHelperBenchmarks
         => HttpHelper.ContainsCacheDirective(_cacheControlMulti, "no-store");
 
     [Benchmark]
-    public void NormalizeAcceptEncoding_Match()
+    public string NormalizeAcceptEncoding_Match()
     {
         _http.Request.Headers.AcceptEncoding = "gzip, deflate, br";
-        HttpHelper.NormalizeAcceptEncoding(_http, _allowedEncodings);
+        return HttpHelper.NormalizeNegotiationHeader(_http.Request.Headers.AcceptEncoding, _allowedEncodings);
     }
 
     [Benchmark]
-    public void NormalizeAcceptEncoding_NoMatch()
+    public string NormalizeAcceptEncoding_NoMatch()
     {
         _http.Request.Headers.AcceptEncoding = "identity";
-        HttpHelper.NormalizeAcceptEncoding(_http, _allowedEncodings);
+        return HttpHelper.NormalizeNegotiationHeader(_http.Request.Headers.AcceptEncoding, _allowedEncodings);
     }
 }

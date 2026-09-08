@@ -1,6 +1,7 @@
 using CacheOrchestrator.DependencyInjection;
 using CacheOrchestrator.DataCache;
 using CacheOrchestrator.Admin;
+using CacheOrchestrator.Identity;
 using CacheOrchestrator.Invalidation;
 using CacheOrchestrator.OutputCache;
 using Microsoft.AspNetCore.Builder;
@@ -249,11 +250,11 @@ public class HttpPipelineContractTests
                 new Dictionary<string, string> { ["Accept"] = "application/json" });
 
             firstCache.Should().Contain("oc=miss");
-            secondCache.Should().Contain("oc=hit");
+            secondCache.Should().Contain("oc=miss");
             firstBody.Should().Contain("text/html").And.Contain("application/json").And.Contain("q=0.9");
             firstBody.Should().NotBe("application/json");
-            secondBody.Should().Be(firstBody);
-            app.Services.GetRequiredService<HitCounter>().Count.Should().Be(1);
+            secondBody.Should().Be("application/json");
+            app.Services.GetRequiredService<HitCounter>().Count.Should().Be(2);
         }
         finally
         {
@@ -527,7 +528,7 @@ public class HttpPipelineContractTests
     }
 
     [Fact]
-    public async Task DefaultEncodingPreferList_CollapsesGzipAndGzipDeflate()
+    public async Task DefaultEncodingNormalization_PreservesCompositeNegotiation()
     {
         string domain = "enc-" + Guid.NewGuid().ToString("N");
         (HttpClient? client, WebApplication? app) = await StartAsync(BaseConfig(domain), a =>
@@ -549,16 +550,141 @@ public class HttpPipelineContractTests
             x1.Should().Contain("oc=miss");
 
             (HttpResponseMessage r2, string x2, string _) = await GetAsync(client, "/x", gzipDeflate);
-            x2.Should().Contain("oc=hit",
-                "default EncodingNormalizationList [br,gzip] must collapse gzip and gzip,deflate");
-            app.Services.GetRequiredService<HitCounter>().Count.Should().Be(1);
+            x2.Should().Contain("oc=miss",
+                "another content coding may be selected by the endpoint");
+            app.Services.GetRequiredService<HitCounter>().Count.Should().Be(2);
 
             (HttpResponseMessage r3, string x3, string _) = await GetAsync(client, "/x", br);
             x3.Should().Contain("oc=miss", "br is a different preferred encoding than gzip");
-            app.Services.GetRequiredService<HitCounter>().Count.Should().Be(2);
+            app.Services.GetRequiredService<HitCounter>().Count.Should().Be(3);
             r1.IsSuccessStatusCode.Should().BeTrue();
             r2.IsSuccessStatusCode.Should().BeTrue();
             r3.IsSuccessStatusCode.Should().BeTrue();
+        }
+        finally
+        {
+            await app.StopAsync(TestContext.Current.CancellationToken);
+            await app.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task AcceptNormalization_ZeroQualityDoesNotCollapseOntoRejectedType()
+    {
+        string domain = "acc-q-" + Guid.NewGuid().ToString("N");
+        Dictionary<string, string?> config = BaseConfig(domain, values =>
+        {
+            values[$"Cache:Domains:{domain}:VaryByAccept"] = "true";
+            values[$"Cache:Domains:{domain}:AcceptNormalizationList:0"] = "application/json";
+            values[$"Cache:Domains:{domain}:AcceptNormalizationList:1"] = "application/xml";
+        });
+
+        (HttpClient client, WebApplication app) = await StartAsync(config, endpoints =>
+        {
+            endpoints.MapGet("/accept-q", (HttpContext http, HitCounter hits) =>
+            {
+                hits.Increment();
+                return Results.Text(http.Request.Headers.Accept.ToString());
+            }).CacheOutputWithDomain(domain);
+        });
+
+        try
+        {
+            (HttpResponseMessage _, string jsonPref, string jsonBody) = await GetAsync(
+                client,
+                "/accept-q",
+                new Dictionary<string, string> { ["Accept"] = "application/json;q=1, application/xml;q=0.1" });
+            (HttpResponseMessage xmlRes, string xmlPref, string xmlBody) = await GetAsync(
+                client,
+                "/accept-q",
+                new Dictionary<string, string> { ["Accept"] = "application/json;q=0, application/xml;q=1" });
+
+            jsonPref.Should().Contain("oc=miss");
+            xmlPref.Should().Contain("oc=miss",
+                "q=0 must not let application/json win the prefer-list collapse");
+            xmlBody.Should().NotBe(jsonBody);
+            xmlRes.Headers.Vary.Should().Contain("Accept");
+            app.Services.GetRequiredService<HitCounter>().Count.Should().Be(2);
+        }
+        finally
+        {
+            await app.StopAsync(TestContext.Current.CancellationToken);
+            await app.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task VaryByAcceptLanguage_EmitsVaryWhenHeaderAbsent()
+    {
+        string domain = "al-" + Guid.NewGuid().ToString("N");
+        Dictionary<string, string?> config = BaseConfig(domain, values =>
+        {
+            values[$"Cache:Domains:{domain}:VaryByAcceptLanguage"] = "true";
+        });
+
+        (HttpClient client, WebApplication app) = await StartAsync(config, endpoints =>
+        {
+            endpoints.MapGet("/lang", (HitCounter hits) =>
+            {
+                hits.Increment();
+                return Results.Text("body");
+            }).CacheOutputWithDomain(domain);
+        });
+
+        try
+        {
+            (HttpResponseMessage res, string cache, string _) = await GetAsync(client, "/lang");
+            cache.Should().Contain("oc=miss");
+            res.Headers.Vary.Should().Contain("Accept-Language");
+        }
+        finally
+        {
+            await app.StopAsync(TestContext.Current.CancellationToken);
+            await app.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task GetAndPost_SameUrl_DoNotShareDataCacheEntry()
+    {
+        string domain = "method-" + Guid.NewGuid().ToString("N");
+        Dictionary<string, string?> config = BaseConfig(domain);
+
+        async Task<IResult> Handler(HttpContext http, IDomainDataCache cache, CancellationToken cancellationToken)
+        {
+            string value = await cache.GetOrSetAsync(
+                http,
+                _ => Task.FromResult(http.Request.Method + " payload"),
+                cancellationToken);
+            return Results.Text(value);
+        }
+
+        (HttpClient client, WebApplication app) = await StartAsync(config, endpoints =>
+        {
+            endpoints.MapGet("/resource", Handler).CacheOutputWithDomain(domain);
+            endpoints.MapPost("/resource", Handler)
+                .CacheOutputWithDomain(domain)
+                .WithCacheIdentity(["POST"], CacheIdentities.Url);
+        });
+
+        try
+        {
+            (HttpResponseMessage getRes, string getCache, string getBody) = await GetAsync(client, "/resource");
+            using HttpRequestMessage postReq = new(HttpMethod.Post, "/resource");
+            HttpResponseMessage postRes = await client.SendAsync(postReq, TestContext.Current.CancellationToken);
+            string postBody = await postRes.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+            string postCache = postRes.Headers.TryGetValues("X-CacheOrchestrator", out IEnumerable<string>? values)
+                ? string.Join(",", values)
+                : string.Empty;
+
+            getRes.IsSuccessStatusCode.Should().BeTrue();
+            postRes.IsSuccessStatusCode.Should().BeTrue();
+            getCache.Should().Contain("dc=miss");
+            getBody.Should().Be("GET payload");
+            postBody.Should().Be("POST payload",
+                "POST must not reuse the GET Data Cache entry for the same URL");
+            postCache.Should().Contain("dc=miss")
+                .And.NotContain("dc=hit", "URL-shaped Data Cache keys must include the HTTP method");
         }
         finally
         {

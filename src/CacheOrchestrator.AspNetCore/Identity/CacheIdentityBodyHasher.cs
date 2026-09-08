@@ -17,6 +17,8 @@ internal static class CacheIdentityBodyHasher
     /// Hashes up to <paramref name="maxBodyBytes"/> of the request body.
     /// Returns <see langword="null"/> when the body exceeds the limit (no silent truncation).
     /// Oversized bodies are logged at <see cref="LogLevel.Warning"/>.
+    /// The limit applies only to identity hashing: buffering remains usable so the endpoint
+    /// can read the full request body after a bypass.
     /// </summary>
     public static async ValueTask<CacheIdentityMaterial?> HashAsync(
         HttpRequest request,
@@ -34,8 +36,12 @@ internal static class CacheIdentityBodyHasher
             return null;
         }
 
+        // Enable buffering so the endpoint can re-read the body after hashing.
+        // Do not set bufferLimit to maxBodyBytes: that limit is only for cache identity.
+        // Oversized bodies still bypass identity, but the request body must remain readable
+        // (host MaxRequestBodySize remains the absolute request size guard).
         if (!request.Body.CanSeek)
-            request.EnableBuffering(bufferThreshold: Math.Min(30_720, maxBodyBytes), bufferLimit: maxBodyBytes + 1);
+            request.EnableBuffering(bufferThreshold: Math.Min(30_720, maxBodyBytes));
 
         Stream body = request.Body;
         long originalPosition = 0;

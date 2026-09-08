@@ -22,6 +22,7 @@ public sealed class DefaultDomainKeyGenerator : IDomainKeyGenerator
     private static readonly byte[] PrefixRoute = "r:"u8.ToArray();
     private static readonly byte[] PrefixParam = "|p:"u8.ToArray();
     private static readonly byte[] PrefixPath = "path:"u8.ToArray();
+    private static readonly byte[] PrefixMethod = "|m:"u8.ToArray();
     private static readonly byte[] PrefixQuery = "|q:"u8.ToArray();
     private static readonly byte[] PrefixEnc = "|e:"u8.ToArray();
     private static readonly byte[] PrefixHdr = "|hdr:"u8.ToArray();
@@ -137,6 +138,18 @@ public sealed class DefaultDomainKeyGenerator : IDomainKeyGenerator
                 AppendRaw(hasher, PrefixPath);
                 AppendString(hasher, http.Request.Path.Value, ref byteBuffer, ref rentedBytes, ref charBuffer, ref rentedChars, lowercase: false);
             }
+
+            // 1b. HTTP method — URL-shaped keys must not share GET/POST (or other) payloads.
+            // Entity-shaped keys stay method-agnostic (resource identity). Method is upper-invariant.
+            AppendRaw(hasher, PrefixMethod);
+            AppendString(
+                hasher,
+                http.Request.Method.ToUpperInvariant(),
+                ref byteBuffer,
+                ref rentedBytes,
+                ref charBuffer,
+                ref rentedChars,
+                lowercase: false);
 
             // 2. Query + header/auth/custom vary (+ encoding via materializer)
             AppendVaryMaterial(hasher, http, opts, vary, includeQuery: true, ref byteBuffer, ref rentedBytes, ref charBuffer, ref rentedChars);

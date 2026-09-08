@@ -120,11 +120,11 @@ Do not disable auth bypass merely to improve hit rate. Confirm the security boun
 
 ### JSON and XML share one URL. How do I keep them separate?
 
-Enable `VaryByAccept: true`, optionally with `AcceptNormalizationList`. Output Cache and Data Cache then use the normalized media type as vary material.
+Enable `VaryByAccept: true`, optionally with `AcceptNormalizationList`. Output Cache and Data Cache then use the complete Accept negotiation material as vary input. An optional normalization list canonicalizes single, parameter-free tokens; composite headers and quality values remain distinct.
 
 ### How do I vary by tenant claim?
 
-Set `AuthBypassMode: Never`, enable user variation, and add the claim name to `VaryByAuthClaims`, or register an `ICacheVaryContributor` for a custom identity rule.
+Set `AuthBypassMode: Never`, enable user variation, and add the claim name to `VaryByAuthClaims`, or register an `ICacheVaryContributor` for a custom identity rule. Remember that a tenant-only claim list shares one server cache entry across every user in that tenant — add a per-user claim when you need per-user separation.
 
 See [Vary](../reference/vary.md).
 

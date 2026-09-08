@@ -290,7 +290,7 @@ public sealed class GraphQlController : ControllerBase
 }
 ```
 
-Same body twice → Output Cache hit (`oc=hit`). Different query text → different hash → separate entry. Body larger than `MaxBodyBytes` → no cache for that request.
+Same body twice → Output Cache hit (`oc=hit`). Different query text → different hash → separate entry. Body larger than `MaxBodyBytes` → content-hash identity is skipped for that request (no Output Cache store for the identity path), but the endpoint can still read the **full** body. `MaxBodyBytes` limits only identity hashing, not the host request body size (use Kestrel / server limits for that).
 
 ### MVC controllers
 

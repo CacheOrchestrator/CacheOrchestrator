@@ -62,13 +62,16 @@ public sealed class DomainHttpCacheOptions
     /// <summary>Whether HTTP cache identity varies by Accept.</summary>
     public bool VaryByAccept { get; init; }
 
-    /// <summary>Preferred Accept values used for normalization.</summary>
+    /// <summary>
+    /// Canonical spellings for single, parameter-free Accept tokens. Composite headers retain
+    /// their complete negotiation material. <see langword="null"/> keeps the raw header.
+    /// </summary>
     public string[]? AcceptNormalizationList { get; init; }
 
     /// <summary>Whether HTTP cache identity varies by Accept-Language.</summary>
     public bool VaryByAcceptLanguage { get; init; }
 
-    /// <summary>Preferred Accept-Language values used for normalization.</summary>
+    /// <summary>Canonical spellings for single, parameter-free Accept-Language tokens; composite headers are retained.</summary>
     public string[]? AcceptLanguageNormalizationList { get; init; }
 
     /// <summary>Additional request headers included in HTTP cache identity.</summary>
@@ -95,7 +98,7 @@ public sealed class DomainHttpCacheOptions
     /// <summary>HTTP status codes that may be stored in Output Cache.</summary>
     public int[] CacheableStatusCodes { get; init; } = [200];
 
-    /// <summary>Preferred Accept-Encoding values used for normalization.</summary>
+    /// <summary>Canonical spellings for single, parameter-free Accept-Encoding tokens; composite headers are retained.</summary>
     public string[]? EncodingNormalizationList { get; init; } = ["br", "gzip"];
 
     /// <summary>Client Cache response cacheability.</summary>

@@ -102,9 +102,10 @@ co3:store:a1b2c3d4e5f60708:e:9c8b7a6d5e4f3210
 |-------|---------------|--------|
 | Route pattern + route parameter values | Endpoint is a `RouteEndpoint` | Pattern text + each route value with value casing preserved |
 | Path | No route endpoint | Full path |
+| HTTP method | Always (URL-shaped only) | Upper-invariant (`GET`, `POST`, …). Prevents GET/POST (and other methods) from sharing one Data Cache entry on the same URL. Entity-shaped keys omit the method. |
 | Query string | Per `VaryByQueryKeys` / `IgnoreQueryKeys` | Default: all non-tracking keys sorted; tracking params excluded (`utm_*`, `gclid`, `fbclid`, …) |
 | `Accept-Encoding` | `DataCache.VaryOnEncoding` | Domain setting |
-| `Accept` / `Accept-Language` | `VaryByAccept` / `VaryByAcceptLanguage` | Optional normalization lists |
+| `Accept` / `Accept-Language` | `VaryByAccept` / `VaryByAcceptLanguage` | Optional normalization lists (default: raw header) |
 | Extra headers / cookies | `VaryByHeaders` / `VaryByCookies` | Sensitive values hashed; see [vary.md](vary.md) |
 | Auth-user / claims | `AuthBypassMode: Never` (or claim list) + `VaryOutputCacheByUser` | Not applied under default auth-bypass modes (key stability) |
 | Scheme + host | `DataCache.VaryOnPublicAddress` | Domain setting |

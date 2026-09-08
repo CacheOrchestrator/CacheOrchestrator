@@ -248,7 +248,7 @@ If an operator needs stronger semantics than the automatic or optional rules pro
 | `VaryByAuthClaims` | null | Claim types for auth-user material |
 | `DataCacheRespectAuthBypass` | **true** | Data Cache skips when the Output Cache authentication bypass would fire. Set `false` only for caller-independent shared data. |
 | `VaryByAccept` / `VaryByAcceptLanguage` | true / false | Content negotiation / locale vary |
-| `AcceptNormalizationList` / `AcceptLanguageNormalizationList` | null | Prefer-lists when those vary flags are on — [vary.md](vary.md) |
+| `AcceptNormalizationList` / `AcceptLanguageNormalizationList` | null (raw header) | Canonical single-token spellings; composite negotiation, quality, wildcards, and parameters remain intact — [vary.md](vary.md) |
 | `VaryByHeaders` / `VaryByCookies` | null | Header/cookie **name** allowlists — [vary.md](vary.md) |
 | `VaryByQueryKeys` | null | `null` = all non-tracking query keys; `[]` = none; non-empty = allowlist |
 | `IgnoreQueryKeys` | null | Extra deny list on top of built-in tracking prefixes |

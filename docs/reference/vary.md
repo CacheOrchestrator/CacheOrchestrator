@@ -24,10 +24,10 @@ All under `Cache:Domains:{name}:` (and `DomainDefaults`).
 | Setting | Default | Output Cache | Data Cache | Notes |
 |---------|---------|--------------|------------|-------|
 | `VaryByAccept` | `true` | ✓ | ✓ | Separates negotiated representations such as JSON and XML. Disable it only when the endpoint always produces the same representation. |
-| `AcceptNormalizationList` | `null` | normalize | normalize | Optional prefer-list used to collapse equivalent `Accept` values. Without a list, the raw header value is used. |
+| `AcceptNormalizationList` | `null` | normalize | normalize | Canonical spellings for single, parameter-free tokens. Default is raw `Accept` (no list). Composite headers, quality factors, wildcards, and parameters remain intact. |
 | `VaryByAcceptLanguage` | `false` | ✓ | ✓ | Locale. Stays off — most JSON APIs are language-agnostic; enabling fragments the cache. |
-| `AcceptLanguageNormalizationList` | `null` | normalize | normalize | e.g. `en`, `sl` when you opt into language vary |
-| `VaryByHeaders` | `null` | ✓ | ✓ | Case-insensitive names; sensitive values hashed. Never auto-fill. |
+| `AcceptLanguageNormalizationList` | `null` | normalize | normalize | Canonical spellings, e.g. `en`, `sl`, when you opt into language vary. Regional subtags and composite preferences remain distinct. |
+| `VaryByHeaders` | `null` | ✓ | ✓ | Case-insensitive names; sensitive values hashed. Never auto-fill. Configured non-secret names are advertised in response `Vary` even when the request omits the header. |
 | `VaryByQueryKeys` | `null` | ✓ | ✓ | `null` = all non-tracking; `[]` = none; non-empty = allowlist |
 | `IgnoreQueryKeys` | `null` | ✓ | ✓ | Extra deny list on top of tracking prefixes |
 | `VaryByCookies` | `null` | ✓ | ✓ | Cookie **names** only; values always hashed. Opt-in only (CSRF / session risks). |
@@ -35,9 +35,11 @@ All under `Cache:Domains:{name}:` (and `DomainDefaults`).
 
 The layer-specific dimensions live in their nested sections: `DataCache.VaryOnEncoding`, `DataCache.VaryOnPublicAddress`, `OutputCache.EncodingNormalizationList`, and `OutputCache.VaryByHost`.
 
-Normalization changes cache identity, not the request. CacheOrchestrator stores the selected prefer-list value as named vary material for both Output Cache and Data Cache while the endpoint handler continues to see the original `Accept`, `Accept-Language`, and `Accept-Encoding` headers. The response `Vary` header still advertises the corresponding non-secret request header.
+Normalization changes cache identity, not the request. CacheOrchestrator stores the canonical single token or complete original negotiation as named vary material for both Output Cache and Data Cache while the endpoint handler continues to see the original `Accept`, `Accept-Language`, and `Accept-Encoding` headers. The response `Vary` header advertises configured non-secret header dimensions even when the request omits them, so intermediate caches do not pin a default representation.
 
-> **Note on query parameters:** Unlike native ASP.NET Core Output Caching (which ignores query parameters by default), CacheOrchestrator's default (`"VaryByQueryKeys": null`) **varies by all query parameters** (except tracking parameters like `utm_*`). To ignore all query parameters like native ASP.NET Core does, explicitly set `"VaryByQueryKeys": []`.
+The normalization lists do **not** negotiate a representation or enumerate everything an endpoint can produce. They canonicalize the spelling of one exact, parameter-free token (for example `GZIP` to `gzip`). A header such as `br;q=0,gzip;q=1,*;q=0.5`, `application/xml, */*`, or `en-US` is retained completely unless it is itself one exact configured token. This preserves formatter, compression, and localization decisions, including explicit exclusions and region differences. Applications that intentionally share additional representations can supply an `ICacheVaryContributor` with the same identity contract as their endpoint.
+
+> **Note on query parameters:** Native ASP.NET Core Output Cache **does** vary by the full query string by default when you call `.CacheOutput()` with no custom policy. CacheOrchestrator's default (`"VaryByQueryKeys": null`) also varies by query parameters, but **excludes** known tracking keys (`utm_*`, click ids, `_ga` / `_gl` variants). To ignore all query parameters, set `"VaryByQueryKeys": []`.
 
 ### Query key examples
 
@@ -61,7 +63,7 @@ Normalization changes cache identity, not the request. CacheOrchestrator stores 
 }
 ```
 
-**No query vary** — empty allowlist: query string never partitions the key (closest to native ASP.NET Core Output Cache default):
+**No query vary** — empty allowlist: query string never partitions the key:
 
 ```json
 {
@@ -98,9 +100,24 @@ Fusion includes **auth-user** in the key only when `AuthBypassMode` is `Never` *
 
 **Private dashboard (cache Output Cache and Data Cache per user):**
 
+When `VaryByAuthClaims` is set, only those claims enter `auth-user` material — the library does **not** automatically append a user id. Include a stable per-user claim (for example `sub` or `NameIdentifier`) whenever the example must separate users. Tenant-only claims share one entry across users in that tenant.
+
 ```json
 {
 "user-dashboard": {
+  "AuthBypassMode": "Never",
+  "VaryOutputCacheByUser": true,
+  "VaryByAuthClaims": [ "sub", "tenant_id" ],
+  "ClientCache": { "Cacheability": "Private" }
+}
+}
+```
+
+**Tenant-shared authenticated cache** (same entry for every user in the tenant — only when the payload is intentionally identical):
+
+```json
+{
+"tenant-catalog": {
   "AuthBypassMode": "Never",
   "VaryOutputCacheByUser": true,
   "VaryByAuthClaims": [ "tenant_id" ],

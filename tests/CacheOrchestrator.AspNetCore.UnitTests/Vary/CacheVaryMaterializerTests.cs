@@ -237,7 +237,7 @@ public class CacheVaryMaterializerTests
         CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.Fusion);
 
         http.Request.Headers.Accept.ToString().Should().Be("text/html, application/json;q=0.9");
-        material.Values["normalized:accept"].Should().Be("application/json");
+        material.Values["normalized:accept"].Should().Be("text/html, application/json;q=0.9");
         material.HeaderNames.Should().NotContain(HeaderNames.Accept);
         material.ResponseVaryHeaderNames.Should().Contain(HeaderNames.Accept);
     }
@@ -253,7 +253,7 @@ public class CacheVaryMaterializerTests
         CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.Fusion);
 
         http.Request.Headers.Accept.ToString().Should().Be("application/json-seq");
-        material.Values["normalized:accept"].Should().BeEmpty();
+        material.Values["normalized:accept"].Should().Be("application/json-seq");
     }
 
     [Fact]
@@ -270,9 +270,74 @@ public class CacheVaryMaterializerTests
         material.Values["normalized:accept"].Should().Be("application/json");
     }
 
+    [Fact]
+    public void AcceptNormalization_PreservesClientQualityInformation()
+    {
+        DefaultHttpContext http = CreateHttp(accept: "application/json;q=0, application/xml;q=1");
+        DomainHttpCacheOptions opts = CreateOptions(
+            varyByAccept: true,
+            acceptNormalization: ["application/json", "application/xml"]);
+
+        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.Fusion);
+
+        material.Values["normalized:accept"].Should().Be("application/json;q=0, application/xml;q=1");
+        material.ResponseVaryHeaderNames.Should().Contain(HeaderNames.Accept);
+    }
+
+    [Fact]
+    public void Build_VaryByAcceptLanguage_AdvertisesVaryWhenHeaderAbsent()
+    {
+        DefaultHttpContext http = CreateHttp();
+        DomainHttpCacheOptions opts = CreateOptions(varyByAcceptLanguage: true);
+
+        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.OutputCache);
+
+        material.HeaderNames.Should().NotContain(HeaderNames.AcceptLanguage);
+        material.Values.Should().NotContainKey("normalized:accept-language");
+        material.ResponseVaryHeaderNames.Should().Contain(HeaderNames.AcceptLanguage);
+    }
+
+    [Fact]
+    public void Build_VaryByAccept_AdvertisesVaryWhenHeaderAbsent()
+    {
+        DefaultHttpContext http = CreateHttp();
+        DomainHttpCacheOptions opts = CreateOptions(varyByAccept: true);
+
+        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.OutputCache);
+
+        material.HeaderNames.Should().NotContain(HeaderNames.Accept);
+        material.ResponseVaryHeaderNames.Should().Contain(HeaderNames.Accept);
+    }
+
+    [Fact]
+    public void Build_ConfiguredExtraHeader_AdvertisesVaryWhenAbsent()
+    {
+        DefaultHttpContext http = CreateHttp();
+        DomainHttpCacheOptions opts = CreateOptions(varyByHeaders: ["X-Api-Version"]);
+
+        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.OutputCache);
+
+        material.HeaderNames.Should().NotContain("X-Api-Version");
+        material.ResponseVaryHeaderNames.Should().Contain("X-Api-Version");
+    }
+
+    [Fact]
+    public void Build_SensitiveConfiguredHeader_DoesNotAdvertiseVaryWhenAbsent()
+    {
+        DefaultHttpContext http = CreateHttp();
+        DomainHttpCacheOptions opts = CreateOptions(
+            authBypassMode: AuthBypassMode.Never,
+            varyByHeaders: ["Authorization"]);
+
+        CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.OutputCache);
+
+        material.ResponseVaryHeaderNames.Should().NotContain(HeaderNames.Authorization);
+    }
+
     private static DomainHttpCacheOptions CreateOptions(
         bool varyEncoding = false,
         bool varyByAccept = false,
+        bool varyByAcceptLanguage = false,
         bool varyByUser = true,
         AuthBypassMode authBypassMode = AuthBypassMode.AuthenticatedOrAuthorization,
         string[]? varyByQueryKeys = null,
@@ -287,6 +352,7 @@ public class CacheVaryMaterializerTests
             VaryOutputCacheByUser = varyByUser,
             DataCacheVaryOnEncoding = varyEncoding,
             VaryByAccept = varyByAccept,
+            VaryByAcceptLanguage = varyByAcceptLanguage,
             VaryByQueryKeys = varyByQueryKeys,
             IgnoreQueryKeys = ignoreQueryKeys,
             VaryByHeaders = varyByHeaders,
