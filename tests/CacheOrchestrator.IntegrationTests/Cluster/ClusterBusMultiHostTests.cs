@@ -923,6 +923,9 @@ public class ClusterBusMultiHostTests
         {
         }
 
+        public EdgeInvalidationTarget CaptureTarget(string instanceName, IConfigurationSection instanceConfiguration) =>
+            new(instanceName, Name, instanceName, new Dictionary<string, string>());
+
         public ValueTask<EdgeInvalidationResult> InvalidateAsync(
             EdgeInvalidationRequest request,
             CancellationToken cancellationToken = default) =>

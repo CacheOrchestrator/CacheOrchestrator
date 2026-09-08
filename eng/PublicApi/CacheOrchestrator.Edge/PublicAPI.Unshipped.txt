@@ -65,16 +65,9 @@ CacheOrchestrator.Edge.DependencyInjection.EdgeServiceCollectionExtensions
 CacheOrchestrator.Edge.DependencyInjection.ICacheOrchestratorEdgeBuilder
 CacheOrchestrator.Edge.DependencyInjection.ICacheOrchestratorEdgeBuilder.ConfigSection.get -> string!
 CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob
-CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob.<Clone>$() -> CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob!
-CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob.EdgeInvalidationJob(string! InstanceName, string! ProviderName, System.Collections.Generic.IReadOnlyList<string!>! Tags) -> void
-CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob.Deconstruct(out string! InstanceName, out string! ProviderName, out System.Collections.Generic.IReadOnlyList<string!>! Tags) -> void
-CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob.Equals(CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob? other) -> bool
 CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob.InstanceName.get -> string!
-CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob.InstanceName.init -> void
 CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob.ProviderName.get -> string!
-CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob.ProviderName.init -> void
 CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob.Tags.get -> System.Collections.Generic.IReadOnlyList<string!>!
-CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob.Tags.init -> void
 CacheOrchestrator.Edge.Invalidation.IEdgeInvalidationQueue
 CacheOrchestrator.Edge.Invalidation.IEdgeInvalidationQueue.EnqueueAsync(CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob! job, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
 CacheOrchestrator.Edge.Providers.EdgeProviderCapabilities
@@ -92,7 +85,6 @@ CacheOrchestrator.Edge.Providers.EdgeProviderCapabilities.SupportsTagInvalidatio
 CacheOrchestrator.Edge.Providers.EdgeInvalidationRequest
 CacheOrchestrator.Edge.Providers.EdgeInvalidationRequest.EdgeInvalidationRequest() -> void
 CacheOrchestrator.Edge.Providers.EdgeInvalidationRequest.InstanceName.get -> string!
-CacheOrchestrator.Edge.Providers.EdgeInvalidationRequest.InstanceName.init -> void
 CacheOrchestrator.Edge.Providers.EdgeInvalidationRequest.Tags.get -> System.Collections.Generic.IReadOnlyList<string!>!
 CacheOrchestrator.Edge.Providers.EdgeInvalidationRequest.Tags.init -> void
 CacheOrchestrator.Edge.Providers.EdgeInvalidationResult
@@ -128,10 +120,21 @@ CacheOrchestrator.Edge.Providers.IEdgeResponseProvider.Name.get -> string!
 CacheOrchestrator.Edge.Tags.EdgeTagProjector
 CacheOrchestrator.Edge.Tags.EdgeTagProjector.EdgeTagProjector() -> void
 CacheOrchestrator.Edge.Tags.EdgeTagProjector.Project(string! edgeNamespace, string! canonicalTag) -> string!
-override CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob.Equals(object? obj) -> bool
-override CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob.GetHashCode() -> int
-override CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob.ToString() -> string!
 static CacheOrchestrator.Edge.DependencyInjection.EdgeServiceCollectionExtensions.AddCacheOrchestratorEdge(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration, System.Action<CacheOrchestrator.Edge.DependencyInjection.ICacheOrchestratorEdgeBuilder!>? configure = null, string! configSection = "Cache") -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob.operator !=(CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob? left, CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob? right) -> bool
-static CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob.operator ==(CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob? left, CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob? right) -> bool
 static CacheOrchestrator.Edge.Providers.EdgeInvalidationResult.Success.get -> CacheOrchestrator.Edge.Providers.EdgeInvalidationResult!
+CacheOrchestrator.Edge.Providers.EdgeInvalidationTarget
+CacheOrchestrator.Edge.Providers.IEdgeInvalidationProvider.CaptureTarget(string! instanceName, Microsoft.Extensions.Configuration.IConfigurationSection! instanceConfiguration) -> CacheOrchestrator.Edge.Providers.EdgeInvalidationTarget!
+CacheOrchestrator.Edge.Providers.EdgeInvalidationRequest.Target.get -> CacheOrchestrator.Edge.Providers.EdgeInvalidationTarget!
+CacheOrchestrator.Edge.Providers.EdgeInvalidationRequest.Target.init -> void
+CacheOrchestrator.Edge.Providers.EdgeInvalidationTarget.InstanceName.get -> string!
+CacheOrchestrator.Edge.Providers.EdgeInvalidationTarget.EdgeInvalidationTarget(string! instanceName, string! providerName, string! routingKey, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! parameters, int formatVersion = 1) -> void
+CacheOrchestrator.Edge.Providers.EdgeInvalidationTarget.ProviderName.get -> string!
+CacheOrchestrator.Edge.Providers.EdgeInvalidationTarget.RoutingKey.get -> string!
+CacheOrchestrator.Edge.Providers.EdgeInvalidationTarget.FormatVersion.get -> int
+CacheOrchestrator.Edge.Providers.EdgeInvalidationTarget.Parameters.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+override CacheOrchestrator.Edge.Providers.EdgeInvalidationTarget.Equals(object? obj) -> bool
+CacheOrchestrator.Edge.Providers.EdgeInvalidationTarget.Equals(CacheOrchestrator.Edge.Providers.EdgeInvalidationTarget? other) -> bool
+override CacheOrchestrator.Edge.Providers.EdgeInvalidationTarget.GetHashCode() -> int
+override CacheOrchestrator.Edge.Providers.EdgeInvalidationTarget.ToString() -> string!
+CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob.EdgeInvalidationJob(CacheOrchestrator.Edge.Providers.EdgeInvalidationTarget! target, System.Collections.Generic.IReadOnlyList<string!>! tags) -> void
+CacheOrchestrator.Edge.Invalidation.EdgeInvalidationJob.Target.get -> CacheOrchestrator.Edge.Providers.EdgeInvalidationTarget!

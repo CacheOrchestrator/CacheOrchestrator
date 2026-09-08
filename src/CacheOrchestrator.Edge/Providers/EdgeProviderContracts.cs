@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 
 namespace CacheOrchestrator.Edge.Providers;
 
@@ -43,8 +44,11 @@ public sealed class EdgeResponseMetadata
 /// <summary>One provider tag-invalidation request.</summary>
 public sealed class EdgeInvalidationRequest
 {
+    /// <summary>The immutable target captured when the job was created.</summary>
+    public required EdgeInvalidationTarget Target { get; init; }
+
     /// <summary>Named edge instance receiving the request.</summary>
-    public string InstanceName { get; init; } = string.Empty;
+    public string InstanceName => Target.InstanceName;
 
     /// <summary>Opaque edge tags to invalidate.</summary>
     public IReadOnlyList<string> Tags { get; init; } = [];
@@ -91,7 +95,13 @@ public interface IEdgeInvalidationProvider
     /// <summary>Provider capabilities and limits.</summary>
     EdgeProviderCapabilities Capabilities { get; }
 
-    /// <summary>Invalidates an opaque tag batch.</summary>
+    /// <summary>
+    /// Copies routing and credentials from one complete EdgeInstances:{name} configuration section.
+    /// This runs when creating invalidation work or reload snapshots, never on the response hot path.
+    /// </summary>
+    EdgeInvalidationTarget CaptureTarget(string instanceName, IConfigurationSection instanceConfiguration);
+
+    /// <summary>Invalidates an opaque tag batch using only its captured target, without resolving current configuration.</summary>
     ValueTask<EdgeInvalidationResult> InvalidateAsync(
         EdgeInvalidationRequest request,
         CancellationToken cancellationToken = default);

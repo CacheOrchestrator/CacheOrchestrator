@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="CacheOrchestrator.Edge.UnitTests" />
+    <InternalsVisibleTo Include="CacheOrchestrator.IntegrationTests" />
     <InternalsVisibleTo Include="CacheOrchestrator.Edge.Cloudflare" />
   </ItemGroup>
 </Project>

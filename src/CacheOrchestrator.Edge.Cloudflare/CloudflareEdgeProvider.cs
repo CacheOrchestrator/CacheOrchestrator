@@ -1,5 +1,5 @@
 using CacheOrchestrator.Edge.Providers;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -15,16 +15,12 @@ internal sealed class CloudflareEdgeProvider : IEdgeResponseProvider, IEdgeInval
     private const string CacheControlHeader = "Cloudflare-CDN-Cache-Control";
 
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IOptionsMonitor<CloudflareEdgeConfiguration> _options;
 
     public CloudflareEdgeProvider(
-        IHttpClientFactory httpClientFactory,
-        IOptionsMonitor<CloudflareEdgeConfiguration> options)
+        IHttpClientFactory httpClientFactory)
     {
         ArgumentNullException.ThrowIfNull(httpClientFactory);
-        ArgumentNullException.ThrowIfNull(options);
         _httpClientFactory = httpClientFactory;
-        _options = options;
     }
 
     public string Name => ProviderName;
@@ -61,25 +57,34 @@ internal sealed class CloudflareEdgeProvider : IEdgeResponseProvider, IEdgeInval
         response.Headers[TagHeader] = string.Join(',', metadata.Tags);
     }
 
+    public EdgeInvalidationTarget CaptureTarget(string instanceName, IConfigurationSection instanceConfiguration)
+    {
+        string? zone = instanceConfiguration["Cloudflare:ZoneId"];
+        string? token = instanceConfiguration["Cloudflare:ApiToken"];
+        if (string.IsNullOrWhiteSpace(zone) || string.IsNullOrWhiteSpace(token))
+            throw new InvalidOperationException("Cloudflare instance configuration is incomplete.");
+        return new(instanceName, Name, zone, new Dictionary<string, string> { ["zoneId"] = zone, ["apiToken"] = token });
+    }
+
     public async ValueTask<EdgeInvalidationResult> InvalidateAsync(
         EdgeInvalidationRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        if (!_options.CurrentValue.EdgeInstances.TryGetValue(
-                request.InstanceName,
-                out CloudflareEdgeInstanceContainer? container)
-            || container.Cloudflare is not { } settings
-            || string.IsNullOrWhiteSpace(settings.ZoneId)
-            || string.IsNullOrWhiteSpace(settings.ApiToken))
+        EdgeInvalidationTarget target = request.Target;
+        if (!string.Equals(target.ProviderName, Name, StringComparison.OrdinalIgnoreCase)
+            || target.FormatVersion != 1
+            || !target.Parameters.TryGetValue("zoneId", out string? zone)
+            || !target.Parameters.TryGetValue("apiToken", out string? token)
+            || string.IsNullOrWhiteSpace(zone) || string.IsNullOrWhiteSpace(token))
         {
-            return new EdgeInvalidationResult { Error = "Cloudflare instance configuration is incomplete." };
+            return new EdgeInvalidationResult { Error = "Cloudflare invalidation target is incomplete or unsupported." };
         }
 
         using var message = new HttpRequestMessage(
             HttpMethod.Post,
-            $"zones/{Uri.EscapeDataString(settings.ZoneId)}/purge_cache");
-        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.ApiToken);
+            $"zones/{Uri.EscapeDataString(zone)}/purge_cache");
+        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         message.Content = JsonContent.Create(new { tags = request.Tags });
 
         try

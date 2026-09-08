@@ -1,6 +1,6 @@
 using CacheOrchestrator.Edge.Providers;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using System.Net;
 using System.Net.Http.Headers;
 
@@ -17,16 +17,12 @@ internal sealed class VarnishEdgeProvider : IEdgeResponseProvider, IEdgeInvalida
     internal const string GraceHeader = "X-CacheOrchestrator-Edge-Grace";
 
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IOptionsMonitor<VarnishEdgeConfiguration> _options;
 
     public VarnishEdgeProvider(
-        IHttpClientFactory httpClientFactory,
-        IOptionsMonitor<VarnishEdgeConfiguration> options)
+        IHttpClientFactory httpClientFactory)
     {
         ArgumentNullException.ThrowIfNull(httpClientFactory);
-        ArgumentNullException.ThrowIfNull(options);
         _httpClientFactory = httpClientFactory;
-        _options = options;
     }
 
     public string Name => ProviderName;
@@ -66,25 +62,40 @@ internal sealed class VarnishEdgeProvider : IEdgeResponseProvider, IEdgeInvalida
         response.Headers[TagHeader] = string.Join(' ', metadata.Tags);
     }
 
+    public EdgeInvalidationTarget CaptureTarget(string instanceName, IConfigurationSection instanceConfiguration)
+    {
+        string? url = instanceConfiguration["Varnish:PurgeUrl"];
+        if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) || uri.Scheme is not ("http" or "https"))
+            throw new InvalidOperationException("Varnish instance configuration is incomplete.");
+        return new(instanceName, Name, uri.AbsoluteUri, new Dictionary<string, string>
+        {
+            ["purgeUrl"] = uri.AbsoluteUri,
+            ["apiKey"] = instanceConfiguration["Varnish:ApiKey"] ?? string.Empty,
+            ["apiKeyHeaderName"] = instanceConfiguration["Varnish:ApiKeyHeaderName"] ?? "X-CacheOrchestrator-Key"
+        });
+    }
+
     public async ValueTask<EdgeInvalidationResult> InvalidateAsync(
         EdgeInvalidationRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        if (!_options.CurrentValue.EdgeInstances.TryGetValue(
-                request.InstanceName,
-                out VarnishEdgeInstanceContainer? container)
-            || container.Varnish is not { } settings
-            || !Uri.TryCreate(settings.PurgeUrl, UriKind.Absolute, out Uri? purgeUri))
+        EdgeInvalidationTarget target = request.Target;
+        if (!string.Equals(target.ProviderName, Name, StringComparison.OrdinalIgnoreCase) || target.FormatVersion != 1
+            || !target.Parameters.TryGetValue("purgeUrl", out string? url)
+            || !Uri.TryCreate(url, UriKind.Absolute, out Uri? purgeUri)
+            || purgeUri.Scheme is not ("http" or "https"))
         {
-            return new EdgeInvalidationResult { Error = "Varnish instance configuration is incomplete." };
+            return new EdgeInvalidationResult { Error = "Varnish invalidation target is incomplete or unsupported." };
         }
+        target.Parameters.TryGetValue("apiKey", out string? apiKey);
+        target.Parameters.TryGetValue("apiKeyHeaderName", out string? apiKeyHeaderName);
 
         using var message = new HttpRequestMessage(new HttpMethod("PURGE"), purgeUri);
         if (!message.Headers.TryAddWithoutValidation(PurgeHeader, string.Join(' ', request.Tags)))
             return new EdgeInvalidationResult { Error = "Varnish invalidation tags could not be encoded as a header." };
-        if (!string.IsNullOrEmpty(settings.ApiKey)
-            && !message.Headers.TryAddWithoutValidation(settings.ApiKeyHeaderName, settings.ApiKey))
+        if (!string.IsNullOrEmpty(apiKey)
+            && !message.Headers.TryAddWithoutValidation(apiKeyHeaderName ?? "X-CacheOrchestrator-Key", apiKey))
         {
             return new EdgeInvalidationResult { Error = "Varnish API-key header name is invalid." };
         }

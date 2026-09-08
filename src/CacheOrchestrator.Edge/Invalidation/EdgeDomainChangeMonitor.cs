@@ -79,7 +79,8 @@ internal sealed class EdgeDomainChangeMonitor : BackgroundService,
                 options.PurgeOnStartup,
                 instance.Name,
                 instance.InvalidationProvider.Name,
-                instance.TagNamespace),
+                instance.TagNamespace,
+                _instances.CaptureTarget(instance.Name, instance.InvalidationProvider.Name)),
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -101,7 +102,8 @@ internal sealed class EdgeDomainChangeMonitor : BackgroundService,
                 options.PurgeOnStartup,
                 instance.Name,
                 instance.InvalidationProvider.Name,
-                instance.TagNamespace),
+                instance.TagNamespace,
+                _instances.CaptureTarget(instance.Name, instance.InvalidationProvider.Name)),
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -245,9 +247,11 @@ internal sealed class EdgeDomainChangeMonitor : BackgroundService,
             string instanceName = specific.Instance ?? defaults.Instance ?? string.Empty;
             string providerName = string.Empty;
             string tagNamespace = string.Empty;
+            EdgeInvalidationTarget? target = null;
             if (enabled && edge.EdgeInstances.TryGetValue(instanceName, out EdgeInstanceOptions? instance))
             {
                 providerName = instance.Provider;
+                target = _instances.CaptureTarget(instanceName, providerName, section.GetSection($"EdgeInstances:{instanceName}"));
                 tagNamespace = !string.IsNullOrWhiteSpace(instance.Namespace)
                     ? instance.Namespace
                     : $"{core.Namespace ?? "app-cache"}-edge-{instanceName}";
@@ -272,6 +276,7 @@ internal sealed class EdgeDomainChangeMonitor : BackgroundService,
                 instanceName,
                 providerName,
                 tagNamespace,
+                target,
                 CaptureEdgeSafetyValues(httpSettings, http.DomainDefaults, httpOverride)));
         }
 
@@ -283,7 +288,7 @@ internal sealed class EdgeDomainChangeMonitor : BackgroundService,
         HashSet<EdgePurgeIdentity> queued,
         CancellationToken cancellationToken)
     {
-        var identity = new EdgePurgeIdentity(state.InstanceName, state.ProviderName, state.TagNamespace);
+        var identity = new EdgePurgeIdentity(state.Target, state.TagNamespace);
         if (queued.Add(identity))
             await EnqueueAsync(state, cancellationToken).ConfigureAwait(false);
     }
@@ -292,7 +297,7 @@ internal sealed class EdgeDomainChangeMonitor : BackgroundService,
     {
         if (string.IsNullOrWhiteSpace(state.InstanceName)
             || string.IsNullOrWhiteSpace(state.ProviderName)
-            || string.IsNullOrWhiteSpace(state.TagNamespace))
+            || string.IsNullOrWhiteSpace(state.TagNamespace) || state.Target is null)
         {
             _logger.LogWarning(
                 "Cannot queue Edge domain purge for '{Domain}' because its effective Edge instance is incomplete.",
@@ -302,12 +307,12 @@ internal sealed class EdgeDomainChangeMonitor : BackgroundService,
 
         string tag = _projector.Project(state.TagNamespace, CacheTags.Domain(state.Domain));
         await _queue.EnqueueAsync(
-            new EdgeInvalidationJob(state.InstanceName, state.ProviderName, [tag]),
+            new EdgeInvalidationJob(state.Target, [tag]),
             cancellationToken).ConfigureAwait(false);
         EdgeMetrics.RecordQueued(state.InstanceName, state.ProviderName, 1);
     }
 
-    private readonly record struct EdgePurgeIdentity(string InstanceName, string ProviderName, string TagNamespace);
+    private readonly record struct EdgePurgeIdentity(EdgeInvalidationTarget? Target, string TagNamespace);
 
     private static readonly string[] EdgeSafetySettingIds =
     [
@@ -367,6 +372,7 @@ internal sealed record EdgeDomainSnapshot(
     string InstanceName,
     string ProviderName,
     string TagNamespace,
+    EdgeInvalidationTarget? Target,
     IReadOnlyDictionary<string, JsonElement>? EdgeSafetyValues = null)
 {
     public IReadOnlyDictionary<string, JsonElement> EdgeSafetyValues { get; init; } =
@@ -375,5 +381,6 @@ internal sealed record EdgeDomainSnapshot(
     public bool HasSamePlacement(EdgeDomainSnapshot other) =>
         string.Equals(InstanceName, other.InstanceName, StringComparison.OrdinalIgnoreCase)
         && string.Equals(ProviderName, other.ProviderName, StringComparison.OrdinalIgnoreCase)
-        && string.Equals(TagNamespace, other.TagNamespace, StringComparison.Ordinal);
+        && string.Equals(TagNamespace, other.TagNamespace, StringComparison.Ordinal)
+        && string.Equals(Target?.RoutingKey, other.Target?.RoutingKey, StringComparison.Ordinal);
 }

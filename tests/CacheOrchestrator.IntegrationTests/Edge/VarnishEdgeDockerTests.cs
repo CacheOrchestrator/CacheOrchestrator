@@ -204,7 +204,7 @@ public sealed class VarnishEdgeDockerTests(VarnishFixture varnish)
         EdgeInvalidationResult invalidation = await provider.InvalidateAsync(
             new EdgeInvalidationRequest
             {
-                InstanceName = "edge",
+                Target = provider.CaptureTarget("edge", builder.Configuration.GetSection("Cache:EdgeInstances:edge")),
                 Tags = ["coe1-integration-item"]
             },
             TestContext.Current.CancellationToken);
