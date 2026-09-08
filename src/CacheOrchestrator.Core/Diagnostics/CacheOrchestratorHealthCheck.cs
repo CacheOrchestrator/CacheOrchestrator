@@ -44,7 +44,6 @@ internal sealed class CacheOrchestratorHealthCheck : IHealthCheck
         data["data_cache_capability:fail_safe"] = capabilities.SupportsFailSafe;
         data["data_cache_capability:eager_refresh"] = capabilities.SupportsEagerRefresh;
         data["data_cache_capability:backplane"] = capabilities.SupportsBackplane;
-        data["data_cache_capability:entry_size_limit"] = capabilities.SupportsEntrySizeLimit;
         data["data_cache_capability:batch_invalidation"] = capabilities.SupportsBatchInvalidation;
 
         foreach ((string? instanceName, CacheOrchestratorOptions.DataCacheInstanceOptions? instanceOpts) in opts.DataCacheInstances)

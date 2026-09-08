@@ -21,7 +21,6 @@ internal static class FusionSettingsPatchMapper
         TimeSpan? jitter = null;
         TimeSpan? factorySoftTimeout = null;
         TimeSpan? factoryHardTimeout = null;
-        int? maxItemBytes = null;
         bool? allowBackgroundDistributed = null;
         bool? allowBackgroundBackplane = null;
 
@@ -54,9 +53,6 @@ internal static class FusionSettingsPatchMapper
                 case "factoryHardTimeoutSeconds":
                     factoryHardTimeout = ReadNonNegSecondsAsTimeSpan(el, id);
                     break;
-                case "maxItemBytes":
-                    maxItemBytes = ReadNonNegInt(el, id);
-                    break;
                 case "allowBackgroundDistributed":
                     allowBackgroundDistributed = ReadBool(el, id);
                     break;
@@ -76,7 +72,6 @@ internal static class FusionSettingsPatchMapper
             Jitter = jitter,
             FactorySoftTimeout = factorySoftTimeout,
             FactoryHardTimeout = factoryHardTimeout,
-            MaxItemBytes = maxItemBytes,
             AllowBackgroundDistributed = allowBackgroundDistributed,
             AllowBackgroundBackplane = allowBackgroundBackplane,
         };

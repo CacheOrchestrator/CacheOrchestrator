@@ -162,7 +162,6 @@ public class DataCacheProviderHitBenchmarks
                 FactoryHardTimeoutSeconds = specific.FactoryHardTimeoutSeconds
                     ?? defaults.FactoryHardTimeoutSeconds
                     ?? 5,
-                MaxItemBytes = specific.MaxItemBytes ?? defaults.MaxItemBytes ?? 0,
                 AllowBackgroundDistributed = specific.AllowBackgroundDistributed
                     ?? defaults.AllowBackgroundDistributed
                     ?? true,

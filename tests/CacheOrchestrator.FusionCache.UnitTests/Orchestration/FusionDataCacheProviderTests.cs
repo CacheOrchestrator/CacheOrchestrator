@@ -46,7 +46,6 @@ public class FusionDataCacheProviderTests
         capabilities.SupportsFailSafe.Should().BeTrue();
         capabilities.SupportsEagerRefresh.Should().BeTrue();
         capabilities.SupportsBackplane.Should().BeTrue();
-        capabilities.SupportsEntrySizeLimit.Should().BeTrue();
         capabilities.SupportsBatchInvalidation.Should().BeTrue();
     }
 

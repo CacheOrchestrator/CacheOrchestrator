@@ -54,8 +54,6 @@ CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.SupportsBatchInval
 CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.SupportsBatchInvalidation.init -> void
 CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.SupportsEagerRefresh.get -> bool
 CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.SupportsEagerRefresh.init -> void
-CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.SupportsEntrySizeLimit.get -> bool
-CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.SupportsEntrySizeLimit.init -> void
 CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.SupportsFailSafe.get -> bool
 CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.SupportsFailSafe.init -> void
 CacheOrchestrator.Orchestration.DataCacheProviderCapabilities.SupportsNamedInstances.get -> bool

@@ -312,7 +312,6 @@ The descriptor says what the registered provider implementation can support, not
 | Fail-safe / stale fallback | Yes | No |
 | Eager refresh | Yes | No |
 | Backplane integration | Yes | No |
-| Entry-size limit | Yes | No |
 | Batch invalidation | Yes | Yes |
 
 Provider name and capabilities are exposed in health-check data and the Admin API health response. Inspect effective configuration and provider health probes as well when you need to know whether a supported distributed store or backplane is actually active.

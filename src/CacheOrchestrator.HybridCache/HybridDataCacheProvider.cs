@@ -304,7 +304,7 @@ internal sealed class HybridDataCacheProvider :
         var prepared = new PreparedDomainOptions
         {
             DomainOptions = domainOptions,
-            // Fusion MaxItemBytes / fail-safe / hard TTL / eager refresh are not mapped.
+            // Fusion fail-safe / hard TTL / eager refresh are not mapped.
             EntryOptions = new HybridCacheEntryOptions
             {
                 Expiration = domainOptions.DataCacheTtl,

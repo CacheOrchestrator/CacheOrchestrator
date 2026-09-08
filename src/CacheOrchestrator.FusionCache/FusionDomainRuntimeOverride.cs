@@ -26,9 +26,6 @@ public sealed class FusionDomainRuntimeOverride
     /// <summary>Override factory hard timeout.</summary>
     public TimeSpan? FactoryHardTimeout { get; init; }
 
-    /// <summary>Override max item bytes.</summary>
-    public int? MaxItemBytes { get; init; }
-
     /// <summary>Override background distributed ops.</summary>
     public bool? AllowBackgroundDistributed { get; init; }
 
@@ -43,7 +40,6 @@ public sealed class FusionDomainRuntimeOverride
         || Jitter is not null
         || FactorySoftTimeout is not null
         || FactoryHardTimeout is not null
-        || MaxItemBytes is not null
         || AllowBackgroundDistributed is not null
         || AllowBackgroundBackplane is not null;
 }
@@ -69,9 +65,6 @@ public sealed class FusionDomainSettingsPatch
     /// <summary>Factory hard timeout.</summary>
     public TimeSpan? FactoryHardTimeout { get; init; }
 
-    /// <summary>Max item bytes.</summary>
-    public int? MaxItemBytes { get; init; }
-
     /// <summary>Background distributed ops.</summary>
     public bool? AllowBackgroundDistributed { get; init; }
 
@@ -86,7 +79,6 @@ public sealed class FusionDomainSettingsPatch
         || Jitter is not null
         || FactorySoftTimeout is not null
         || FactoryHardTimeout is not null
-        || MaxItemBytes is not null
         || AllowBackgroundDistributed is not null
         || AllowBackgroundBackplane is not null;
 }

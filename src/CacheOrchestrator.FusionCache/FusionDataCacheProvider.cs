@@ -22,7 +22,6 @@ internal sealed class FusionDataCacheProvider :
         SupportsFailSafe = true,
         SupportsEagerRefresh = true,
         SupportsBackplane = true,
-        SupportsEntrySizeLimit = true,
         SupportsBatchInvalidation = true
     };
     private readonly IFusionCacheProvider _fusionProvider;

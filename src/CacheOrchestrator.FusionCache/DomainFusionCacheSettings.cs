@@ -33,10 +33,6 @@ public sealed class DomainFusionCacheSettings
     [DomainSetting(Kind = DomainSettingValueKind.Int, RuntimeOverlay = true, Group = "Fusion", DisplayName = "Factory hard timeout (seconds)")]
     public int? FactoryHardTimeoutSeconds { get; set; }
 
-    /// <summary>Optional max item size for memory cache (bytes). 0 = unlimited.</summary>
-    [DomainSetting(Kind = DomainSettingValueKind.Int, RuntimeOverlay = true, Group = "Fusion", DisplayName = "Max item bytes")]
-    public int? MaxItemBytes { get; set; }
-
     /// <summary>Allow background distributed cache operations.</summary>
     [DomainSetting(Kind = DomainSettingValueKind.Bool, RuntimeOverlay = true, Group = "Fusion", DisplayName = "Background distributed ops")]
     public bool? AllowBackgroundDistributed { get; set; }

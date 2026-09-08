@@ -101,8 +101,6 @@ internal sealed class FusionDomainSettingsProvider : IFusionDomainSettingsProvid
             JitterSeconds = ToNonNegSeconds(jitter),
             FactorySoftTimeoutSeconds = ToNonNegSeconds(factorySoft),
             FactoryHardTimeoutSeconds = ToNonNegSeconds(factoryHard),
-            MaxItemBytes = overlay?.MaxItemBytes
-                ?? Pick(specific.MaxItemBytes, defaults.MaxItemBytes, 0),
             AllowBackgroundDistributed = overlay?.AllowBackgroundDistributed
                 ?? Pick(specific.AllowBackgroundDistributed, defaults.AllowBackgroundDistributed, true),
             AllowBackgroundBackplane = overlay?.AllowBackgroundBackplane

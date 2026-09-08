@@ -211,7 +211,7 @@ The Admin settings PATCH accepts `applyImmediately: true` for the optional actio
 | `DataCache.Enabled`, `OutputCache.Enabled` | Disabling bypasses the layer immediately, but retained entries expire naturally | Disabling also evicts that domain from the affected layer; enabling does not evict |
 | `DataCache.Instance` | New requests use the new instance; entries in the old instance expire naturally | Same |
 | `DataCache.TtlSeconds`, `OutputCache.TtlSeconds` | Existing entries retain their creation TTL | A decrease evicts the affected domain layer once; an increase does not |
-| `FusionCache.HardTtlSeconds`, `FailSafeSeconds`, `JitterSeconds`, `MaxItemBytes` | Existing entries retain their creation policy | A decrease evicts the domain from Data Cache once; an increase does not |
+| `FusionCache.HardTtlSeconds`, `FailSafeSeconds`, `JitterSeconds` | Existing entries retain their creation policy | A decrease evicts the domain from Data Cache once; an increase does not |
 | Other `FusionCache` settings | Affect subsequent cache operations/factories; existing entries expire naturally | No additional invalidation |
 | `OutputCache.ETagMode` | Existing OC/Edge responses retain their original ETag until expiration | Evicts OC and purges enabled Edge |
 | `OutputCache.CacheableStatusCodes` | Affects new storage decisions; existing responses expire naturally | Not runtime-patchable; no additional reload invalidation |
@@ -316,9 +316,10 @@ Bound from `Cache:DomainDefaults:FusionCache` / `Cache:Domains:{name}:FusionCach
 | `JitterSeconds` | `60` | Max jitter on duration (seconds) |
 | `FactorySoftTimeoutSeconds` | `1` | Factory soft timeout (seconds) |
 | `FactoryHardTimeoutSeconds` | `5` | Factory hard timeout (seconds) |
-| `MaxItemBytes` | 0 | Memory size limit; 0 = unlimited |
 | `AllowBackgroundDistributed` | true | Fusion may complete L2 I/O in the background |
 | `AllowBackgroundBackplane` | true | Fusion may publish backplane messages in the background |
+
+`MaxItemBytes` and its runtime-overlay key were removed for 3.0. The beta setting assigned a fixed native cache weight; it never measured or limited payload bytes. Remove it from configuration (including a value of `0`); Fusion configuration validation rejects the old key. CacheOrchestrator exposes no replacement size setting or size-limit capability. Applications that require memory budgets must configure and own them through the underlying cache engine. The native [memory-cache size contract](https://learn.microsoft.com/en-us/aspnet/core/performance/caching/memory#use-setsize-size-and-sizelimit-to-limit-cache-size) uses application-defined units.
 
 ## Admin API (`Cache:Admin`)
 

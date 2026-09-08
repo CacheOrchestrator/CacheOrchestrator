@@ -1,1 +1,7 @@
 #nullable enable
+*REMOVED*CacheOrchestrator.FusionCache.DomainFusionCacheSettings.MaxItemBytes.get -> int?
+*REMOVED*CacheOrchestrator.FusionCache.DomainFusionCacheSettings.MaxItemBytes.set -> void
+*REMOVED*CacheOrchestrator.FusionCache.FusionDomainRuntimeOverride.MaxItemBytes.get -> int?
+*REMOVED*CacheOrchestrator.FusionCache.FusionDomainRuntimeOverride.MaxItemBytes.init -> void
+*REMOVED*CacheOrchestrator.FusionCache.FusionDomainSettingsPatch.MaxItemBytes.get -> int?
+*REMOVED*CacheOrchestrator.FusionCache.FusionDomainSettingsPatch.MaxItemBytes.init -> void

@@ -46,7 +46,7 @@ internal sealed class RedisFusionCacheBackendRegistrar : IFusionCacheBackendRegi
         context.Services.AddSingleton<ICacheOrchestratorHealthProbe>(sp =>
         {
             IConnectionMultiplexer mux = sp.GetRequiredKeyedService<IConnectionMultiplexer>(instanceName);
-            return new RedisCacheHealthProbe($"redis:{instanceName}", mux);
+            return new RedisCacheHealthProbe($"redis:data-cache:{instanceName}", mux);
         });
 
         context.Services.TryAddKeyedSingleton<IDistributedCache>(instanceName, (sp, _) =>

@@ -49,7 +49,6 @@ internal sealed class FusionDomainRuntimeOverrideStore : IFusionDomainRuntimeOve
             Jitter = patch.Jitter ?? existing.Jitter,
             FactorySoftTimeout = patch.FactorySoftTimeout ?? existing.FactorySoftTimeout,
             FactoryHardTimeout = patch.FactoryHardTimeout ?? existing.FactoryHardTimeout,
-            MaxItemBytes = patch.MaxItemBytes ?? existing.MaxItemBytes,
             AllowBackgroundDistributed = patch.AllowBackgroundDistributed ?? existing.AllowBackgroundDistributed,
             AllowBackgroundBackplane = patch.AllowBackgroundBackplane ?? existing.AllowBackgroundBackplane,
         };
