@@ -3,9 +3,9 @@
 # CacheOrchestrator
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%2010.0-blueviolet.svg?style=flat-square)](https://www.nuget.org/packages/CacheOrchestrator/3.0.0-beta.4)
+[![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%2010.0-blueviolet.svg?style=flat-square)](https://www.nuget.org/packages/CacheOrchestrator/3.0.0-beta.5)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/CacheOrchestrator/CacheOrchestrator/build.yml?branch=main&style=flat-square)](https://github.com/CacheOrchestrator/CacheOrchestrator/actions)
-[![NuGet](https://img.shields.io/nuget/vpre/CacheOrchestrator.svg?style=flat-square)](https://www.nuget.org/packages/CacheOrchestrator/3.0.0-beta.4)
+[![NuGet](https://img.shields.io/nuget/vpre/CacheOrchestrator.svg?style=flat-square)](https://www.nuget.org/packages/CacheOrchestrator/3.0.0-beta.5)
 
 **CacheOrchestrator is a multi-tier cache coordination and synchronized invalidation library for .NET.**
 
@@ -232,19 +232,19 @@ The library is **modular**. `CacheOrchestrator.Core` provides the foundational p
 
 | Package | Purpose |
 |---------|---------|
-| [CacheOrchestrator](https://www.nuget.org/packages/CacheOrchestrator/3.0.0-beta.4) | Meta package: `CacheOrchestrator.AspNetCore` + `CacheOrchestrator.FusionCache` (for typical web apps). |
-| [CacheOrchestrator.Core](https://www.nuget.org/packages/CacheOrchestrator.Core/3.0.0-beta.4) | Domain models, orchestration, invalidation, and management contracts (no ASP.NET dependency). |
-| [CacheOrchestrator.AspNetCore](https://www.nuget.org/packages/CacheOrchestrator.AspNetCore/3.0.0-beta.4) | Output Cache, Client Cache, HTTP helpers, and the Admin API. |
-| [CacheOrchestrator.FusionCache](https://www.nuget.org/packages/CacheOrchestrator.FusionCache/3.0.0-beta.4) | ZiggyCreatures FusionCache Data Cache provider. |
-| [CacheOrchestrator.HybridCache](https://www.nuget.org/packages/CacheOrchestrator.HybridCache/3.0.0-beta.4) | Microsoft HybridCache Data Cache provider. |
-| [CacheOrchestrator.Redis](https://www.nuget.org/packages/CacheOrchestrator.Redis/3.0.0-beta.4) | Meta Redis: Output Cache store and Fusion L2 / backplane (`AddRedisBackend`). |
-| [CacheOrchestrator.AspNetCore.Redis](https://www.nuget.org/packages/CacheOrchestrator.AspNetCore.Redis/3.0.0-beta.4) | Redis Output Cache store only (`AddRedisOutputCacheBackend`). |
-| [CacheOrchestrator.FusionCache.Redis](https://www.nuget.org/packages/CacheOrchestrator.FusionCache.Redis/3.0.0-beta.4) | Redis Fusion L2 / backplane only (`AddRedisFusionCacheBackend`). |
-| [CacheOrchestrator.HttpBus](https://www.nuget.org/packages/CacheOrchestrator.HttpBus/3.0.0-beta.4) | Syncs invalidations, versions, and settings across all instances via HTTP cluster bus. |
-| [CacheOrchestrator.EFCore.Invalidation](https://www.nuget.org/packages/CacheOrchestrator.EFCore.Invalidation/3.0.0-beta.4) | Automatic cache invalidation after a successful Entity Framework Core `SaveChanges`. |
-| [CacheOrchestrator.Edge](https://www.nuget.org/packages/CacheOrchestrator.Edge/3.0.0-beta.4) | Provider-neutral opaque response tags and queued edge invalidation contracts. |
-| [CacheOrchestrator.Edge.Cloudflare](https://www.nuget.org/packages/CacheOrchestrator.Edge.Cloudflare/3.0.0-beta.4) | Cloudflare `Cache-Tag`, edge cache-control, and purge API provider. |
-| [CacheOrchestrator.Edge.Varnish](https://www.nuget.org/packages/CacheOrchestrator.Edge.Varnish/3.0.0-beta.4) | Varnish `xkey`, edge TTL/grace metadata, and protected PURGE provider. |
+| [CacheOrchestrator](https://www.nuget.org/packages/CacheOrchestrator/3.0.0-beta.5) | Meta package: `CacheOrchestrator.AspNetCore` + `CacheOrchestrator.FusionCache` (for typical web apps). |
+| [CacheOrchestrator.Core](https://www.nuget.org/packages/CacheOrchestrator.Core/3.0.0-beta.5) | Domain models, orchestration, invalidation, and management contracts (no ASP.NET dependency). |
+| [CacheOrchestrator.AspNetCore](https://www.nuget.org/packages/CacheOrchestrator.AspNetCore/3.0.0-beta.5) | Output Cache, Client Cache, HTTP helpers, and the Admin API. |
+| [CacheOrchestrator.FusionCache](https://www.nuget.org/packages/CacheOrchestrator.FusionCache/3.0.0-beta.5) | ZiggyCreatures FusionCache Data Cache provider. |
+| [CacheOrchestrator.HybridCache](https://www.nuget.org/packages/CacheOrchestrator.HybridCache/3.0.0-beta.5) | Microsoft HybridCache Data Cache provider. |
+| [CacheOrchestrator.Redis](https://www.nuget.org/packages/CacheOrchestrator.Redis/3.0.0-beta.5) | Meta Redis: Output Cache store and Fusion L2 / backplane (`AddRedisBackend`). |
+| [CacheOrchestrator.AspNetCore.Redis](https://www.nuget.org/packages/CacheOrchestrator.AspNetCore.Redis/3.0.0-beta.5) | Redis Output Cache store only (`AddRedisOutputCacheBackend`). |
+| [CacheOrchestrator.FusionCache.Redis](https://www.nuget.org/packages/CacheOrchestrator.FusionCache.Redis/3.0.0-beta.5) | Redis Fusion L2 / backplane only (`AddRedisFusionCacheBackend`). |
+| [CacheOrchestrator.HttpBus](https://www.nuget.org/packages/CacheOrchestrator.HttpBus/3.0.0-beta.5) | Syncs invalidations, versions, and settings across all instances via HTTP cluster bus. |
+| [CacheOrchestrator.EFCore.Invalidation](https://www.nuget.org/packages/CacheOrchestrator.EFCore.Invalidation/3.0.0-beta.5) | Automatic cache invalidation after a successful Entity Framework Core `SaveChanges`. |
+| [CacheOrchestrator.Edge](https://www.nuget.org/packages/CacheOrchestrator.Edge/3.0.0-beta.5) | Provider-neutral opaque response tags and queued edge invalidation contracts. |
+| [CacheOrchestrator.Edge.Cloudflare](https://www.nuget.org/packages/CacheOrchestrator.Edge.Cloudflare/3.0.0-beta.5) | Cloudflare `Cache-Tag`, edge cache-control, and purge API provider. |
+| [CacheOrchestrator.Edge.Varnish](https://www.nuget.org/packages/CacheOrchestrator.Edge.Varnish/3.0.0-beta.5) | Varnish `xkey`, edge TTL/grace metadata, and protected PURGE provider. |
 
 
 | Application | Purpose |
