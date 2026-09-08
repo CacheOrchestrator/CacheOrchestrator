@@ -3,7 +3,6 @@
 		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<LangVersion>latest</LangVersion>
 		<PackageId>CacheOrchestrator.FusionCache.Redis</PackageId>
 		<Description>Redis L2 and backplane for CacheOrchestrator.FusionCache.</Description>
 		<PackageTags>cache;caching;redis;fusioncache;cacheorchestrator</PackageTags>

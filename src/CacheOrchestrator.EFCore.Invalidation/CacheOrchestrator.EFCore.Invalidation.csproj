@@ -3,7 +3,6 @@
 		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<LangVersion>latest</LangVersion>
 		<PackageId>CacheOrchestrator.EFCore.Invalidation</PackageId>
 		<Description>EF Core SaveChanges hook for CacheOrchestrator: map CLR types to (domain, entityKind) and purge entity tags after a successful transaction commit.</Description>
 		<PackageTags>cache;caching;efcore;entityframework;invalidation;cacheorchestrator;aspnetcore</PackageTags>

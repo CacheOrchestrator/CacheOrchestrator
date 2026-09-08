@@ -383,7 +383,7 @@ dotnet test tests/CacheOrchestrator.IntegrationTests/CacheOrchestrator.Integrati
   --filter FullyQualifiedName~VarnishEdgeDockerTests
 ```
 
-For an interactive version of the same flow, run [Playground Lab 06](../../samples/CacheOrchestrator.Sample/labs/README.md#stage-06-varnish-edge). It places Varnish in front of the Stage 02 single-origin/Redis-L2 topology; the origin remains internal to the Compose network.
+For an interactive version of the same flow, run [Playground Lab 06](../../samples/CacheOrchestrator.Sample/labs/README.md#stage-06--varnish-edge). It places Varnish in front of the Stage 02 single-origin/Redis-L2 topology; the origin remains internal to the Compose network.
 
 ## Operational signals
 

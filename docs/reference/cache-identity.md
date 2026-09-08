@@ -15,7 +15,7 @@ Namespace: `CacheOrchestrator.Identity`.
 - [API surface](#api-surface)
 - [Cheat sheet](#cheat-sheet)
 - [DX examples](#dx-examples)
-- [GET / HEAD with a custom identity](#get-head-with-a-custom-identity)
+- [GET / HEAD with a custom identity](#get--head-with-a-custom-identity)
 - [Fail-fast](#fail-fast)
 - [Performance notes](#performance-notes)
 
@@ -88,7 +88,7 @@ The Data Cache provider-key shape is `co3:{escapedDomain}:{versionHex}:u:{hash}`
 | `[CacheIdentity(["POST"], CacheIdentities.Url)]` | MVC form of Url identity on POST |
 | `AddCacheIdentityContract<T>()` | Register a singleton `ICacheIdentityContract` |
 
-The same fluent calls and attributes accept **GET** and **HEAD** in the method list (for example `.WithCacheIdentity(["GET", "HEAD"], "…")`). The table uses **POST** because that is the usual opt-in; see [GET / HEAD with a custom identity](#get-head-with-a-custom-identity).
+The same fluent calls and attributes accept **GET** and **HEAD** in the method list (for example `.WithCacheIdentity(["GET", "HEAD"], "…")`). The table uses **POST** because that is the usual opt-in; see [GET / HEAD with a custom identity](#get--head-with-a-custom-identity).
 
 ### Minimal API vs MVC
 

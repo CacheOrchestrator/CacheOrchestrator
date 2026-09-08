@@ -47,7 +47,9 @@ Misconfiguration (e.g. caching private user data as `public` without per-user va
 By default the library emits **`X-CacheOrchestrator`** (hit/miss, domain, schedule phase). This is useful for operations and debugging but is client-visible. To disable diagnostic headers in production:
 
 ```json
-"Cache": { "EmitDiagnosticsHeaders": false }
+{
+  "Cache": { "EmitDiagnosticsHeaders": false }
+}
 ```
 
 Metrics and tracing are unaffected. See [docs/reference/observability.md](docs/reference/observability.md).

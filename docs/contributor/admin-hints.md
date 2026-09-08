@@ -67,11 +67,13 @@ Rules run **only in the Admin Console App**, not on each instance’s caching ho
 ## Config (summary)
 
 ```json
-"AdminConsole": {
-  "Hints": {
-    "RuleFiles": [ "hints/*.json" ],
-    "DisabledCodes": [],
-    "DisabledStatePath": "hints/disabled.local.json"
+{
+  "AdminConsole": {
+    "Hints": {
+      "RuleFiles": [ "hints/*.json" ],
+      "DisabledCodes": [],
+      "DisabledStatePath": "hints/disabled.local.json"
+    }
   }
 }
 ```

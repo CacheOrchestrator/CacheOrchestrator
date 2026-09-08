@@ -2,6 +2,7 @@ using BenchmarkDotNet.Attributes;
 using CacheOrchestrator.Configuration;
 using CacheOrchestrator.Identity;
 using CacheOrchestrator.OutputCache;
+using CacheOrchestrator.Vary;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.OutputCaching;
@@ -50,6 +51,14 @@ public class CacheIdentityPolicyBenchmarks
     [Benchmark]
     public async Task CacheRequest_Post_ContentHash()
         => await _policy.CacheRequestAsync(_postHash, CancellationToken.None);
+
+    [GlobalCleanup]
+    public void Cleanup()
+    {
+        ((ServiceProvider)_postHash.HttpContext.RequestServices).Dispose();
+        ((ServiceProvider)_getNoIdentity.HttpContext.RequestServices).Dispose();
+        _postHash.HttpContext.Request.Body.Dispose();
+    }
 
     private static OutputCacheContext CreateContext(
         string method,
@@ -104,6 +113,7 @@ public class CacheIdentityPolicyBenchmarks
         services.AddSingleton<IRequestDomainCacheOptions>(provider);
         services.AddSingleton(typeof(ILogger<DomainOutputCachePolicy>), NullLogger<DomainOutputCachePolicy>.Instance);
         services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<CacheVaryMaterializer>();
         http.RequestServices = services.BuildServiceProvider();
         provider.EnsureDomainOptions(http, cfg.Domain);
 

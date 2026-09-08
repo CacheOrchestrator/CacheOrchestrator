@@ -3,7 +3,6 @@
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <LangVersion>latest</LangVersion>
     <PackageId>CacheOrchestrator.Edge.Varnish</PackageId>
     <Description>Varnish xkey response tags and queued invalidation provider for CacheOrchestrator.Edge.</Description>
     <PackageTags>cache;caching;edge;varnish;xkey;purge;cacheorchestrator</PackageTags>

@@ -33,7 +33,7 @@ app.MapCacheOrchestratorHttpBus();
 - [Single instance (in-memory only)](#single-instance-in-memory-only)
 - [Multiple instances with Redis](#multiple-instances-with-redis)
 - [Multiple instances without Redis (InMemory Data Cache, no backplane)](#multiple-instances-without-redis-inmemory-data-cache-no-backplane)
-- [Mixed backends (Output Cache InMemory + Data Cache Redis)](#mixed-backends-output-cache-inmemory-data-cache-redis)
+- [Mixed backends (Output Cache InMemory + Data Cache Redis)](#mixed-backends-output-cache-inmemory--data-cache-redis)
 - [Using multiple Data Cache instances](#using-multiple-data-cache-instances)
 - [Shared configuration across instances](#shared-configuration-across-instances)
 - [Security checklist](#security-checklist)

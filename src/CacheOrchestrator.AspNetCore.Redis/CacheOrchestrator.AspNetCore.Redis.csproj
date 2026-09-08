@@ -3,7 +3,6 @@
 		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<LangVersion>latest</LangVersion>
 		<PackageId>CacheOrchestrator.AspNetCore.Redis</PackageId>
 		<Description>Redis Output Cache store for CacheOrchestrator.AspNetCore.</Description>
 		<PackageTags>cache;caching;redis;outputcache;cacheorchestrator;aspnetcore</PackageTags>

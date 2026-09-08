@@ -3,7 +3,6 @@
 		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<LangVersion>latest</LangVersion>
 		<PackageId>CacheOrchestrator.Redis.Shared</PackageId>
 		<Description>Support library for CacheOrchestrator Redis backends (connection options and configuration resolution). Not intended to be referenced directly by applications — install CacheOrchestrator.Redis, CacheOrchestrator.AspNetCore.Redis, or CacheOrchestrator.FusionCache.Redis instead.</Description>
 		<PackageTags>cache;caching;redis;cacheorchestrator</PackageTags>

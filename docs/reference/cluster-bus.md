@@ -20,7 +20,7 @@ Package README: [src/CacheOrchestrator.HttpBus/README.md](../../src/CacheOrchest
 - [Admin Console App interaction](#admin-console-app-interaction)
 - [Bus vs Redis backplane](#bus-vs-redis-backplane)
 - [Observability](#observability)
-- [Zero effect / performance](#zero-effect-performance)
+- [Zero effect / performance](#zero-effect--performance)
 - [Security checklist](#security-checklist)
 
 ## When to use it

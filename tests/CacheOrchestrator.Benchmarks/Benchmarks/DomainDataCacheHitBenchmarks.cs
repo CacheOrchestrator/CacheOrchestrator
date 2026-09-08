@@ -3,6 +3,7 @@ using CacheOrchestrator.Configuration;
 using CacheOrchestrator.DataCache;
 using CacheOrchestrator.DependencyInjection;
 using CacheOrchestrator.Entity;
+using CacheOrchestrator.Invalidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +17,7 @@ public class DomainDataCacheHitBenchmarks
 {
     private ServiceProvider _services = null!;
     private IDomainDataCache _cache = null!;
+    private ICacheOrchestratorInvalidator _invalidator = null!;
     private DefaultHttpContext _domainRequest = null!;
     private DefaultHttpContext _footprintRequest = null!;
     private DefaultHttpContext _staleFootprintRequest = null!;
@@ -47,6 +49,7 @@ public class DomainDataCacheHitBenchmarks
         services.AddCacheOrchestratorFusionCache(configuration);
         _services = services.BuildServiceProvider();
         _cache = _services.GetRequiredService<IDomainDataCache>();
+        _invalidator = _services.GetRequiredService<ICacheOrchestratorInvalidator>();
 
         _domainRequest = CreateRequest("/api/catalog");
         _footprintRequest = CreateRequest("/api/products/42");
@@ -92,6 +95,16 @@ public class DomainDataCacheHitBenchmarks
         http.Request.Method = HttpMethods.Get;
         http.Request.Path = path;
         return http;
+    }
+
+    [Benchmark]
+    public async Task<string?> EntityFootprint_InvalidateAndRefresh()
+    {
+        CacheInvalidationResult result = await _invalidator.InvalidateEntityAsync("catalog", "products", "42");
+        if (!result.Succeeded)
+            throw new InvalidOperationException("Benchmark invalidation failed.");
+        ResetRequestState(_footprintRequest);
+        return await _cache.GetOrSetEntityAsync(_footprintRequest, FootprintFactory);
     }
 
     private static void ResetRequestState(HttpContext http)

@@ -22,3 +22,4 @@ samples/**/smoke.run.log
 # Playground local SQLite (shared path in labs 03–05 is under the Docker volume)
 samples/**/Data/*.db
 samples/**/Data/*.db-*
+.artifacts/

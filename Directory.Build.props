@@ -1,5 +1,7 @@
 <Project>
+  <Import Project="eng/ReleaseProjects.props" />
   <PropertyGroup>
+    <LangVersion>14.0</LangVersion>
     <Authors>Ales Marinsek</Authors>
     <Company>Ales Marinsek</Company>
     <Copyright>Copyright © 2026 Ales Marinsek</Copyright>
@@ -13,7 +15,7 @@
       - Tag format: v1.0.0  (prefix "v" is stripped)
       - After v1.0.0, commits without a new tag become 1.0.1-rc.0.{height} (default pre-release)
       - Do NOT hardcode <Version> here — it would fight MinVer.
-      Release process: CONTRIBUTING.md / docs/releasing.md
+      Release process: CONTRIBUTING.md / docs/contributor/releasing.md
     -->
     <MinVerTagPrefix>v</MinVerTagPrefix>
     <MinVerMinimumMajorMinor>1.0</MinVerMinimumMajorMinor>
@@ -63,7 +65,7 @@
 
   <!-- Public API baselines are release contracts for every packable library. -->
   <PropertyGroup>
-    <_PublicApiProjectNames>;CacheOrchestrator;CacheOrchestrator.AspNetCore;CacheOrchestrator.AspNetCore.Redis;CacheOrchestrator.Edge;CacheOrchestrator.Edge.Cloudflare;CacheOrchestrator.Edge.Varnish;CacheOrchestrator.Core;CacheOrchestrator.EFCore.Invalidation;CacheOrchestrator.FusionCache;CacheOrchestrator.FusionCache.Redis;CacheOrchestrator.HttpBus;CacheOrchestrator.HybridCache;CacheOrchestrator.Redis;CacheOrchestrator.Redis.Shared;</_PublicApiProjectNames>
+    <_PublicApiProjectNames>;$(ReleasePackageNames);</_PublicApiProjectNames>
     <_IsPublicApiProject>$([System.String]::Copy('$(_PublicApiProjectNames)').Contains(';$(MSBuildProjectName);'))</_IsPublicApiProject>
   </PropertyGroup>
   <PropertyGroup Condition="'$(_IsPublicApiProject)' == 'true'">

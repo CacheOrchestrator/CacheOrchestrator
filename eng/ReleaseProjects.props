@@ -1,0 +1,6 @@
+<Project>
+  <!-- Shared by API validation and both CI workflows through verify-release.ps1. -->
+  <PropertyGroup>
+    <ReleasePackageNames>CacheOrchestrator;CacheOrchestrator.AspNetCore;CacheOrchestrator.AspNetCore.Redis;CacheOrchestrator.Core;CacheOrchestrator.Edge;CacheOrchestrator.Edge.Cloudflare;CacheOrchestrator.Edge.Varnish;CacheOrchestrator.EFCore.Invalidation;CacheOrchestrator.FusionCache;CacheOrchestrator.FusionCache.Redis;CacheOrchestrator.HttpBus;CacheOrchestrator.HybridCache;CacheOrchestrator.Redis;CacheOrchestrator.Redis.Shared</ReleasePackageNames>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,2 @@
+# Use normal consumer defaults instead of the repository's contributor style rules.
+root = true

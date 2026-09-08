@@ -277,7 +277,8 @@ Implement `IDataCacheProvider` only when adding a complete engine alongside Fusi
 |--------|----------|
 | `Name` | Stable provider name used in diagnostics |
 | `GetOrCreateAsync<T>` | Read or produce a value and return `DataCacheProviderResult<T>` with the actual outcome |
-| `SetAsync<T>` | Overwrite the value and final tags after footprint expansion |
+| `GetOrCreateWithTagsAsync<T>` | Select complete tags after each successful factory execution and attach them before publishing that materialization, including background refresh |
+| `SetAsync<T>` | Explicitly overwrite the value and tags together |
 | `InvalidateAsync` | Remove all requested tags from one named instance, or from all instances when `InstanceName` is `null` |
 
 `DataCacheProviderRequest` contains:
@@ -289,9 +290,9 @@ Implement `IDataCacheProvider` only when adding a complete engine alongside Fusi
 | `Tags` | Domain, entity, entity-kind, and custom tags |
 | `DomainOptions` | Resolved portable policy snapshot |
 
-`DataCacheProviderResult<T>.Outcome` must be `Materialized` only when the returned value came from this call's successfully completed factory invocation, `Cached` for a fresh hit, and `Stale` whenever fail-safe or a background refresh returns an expired value. Never return `Unknown`; it is the invalid default-struct state and the orchestrator rejects it. The orchestrator uses this distinction both for HTTP disposition and to decide whether a factory-expanded entity footprint may replace stored tags.
+`DataCacheProviderResult<T>.Outcome` must be `Materialized` only when the returned value came from this call's successfully completed factory invocation, `Cached` for a fresh hit, and `Stale` whenever fail-safe or a background refresh returns an expired value. Never return `Unknown`; it is the invalid default-struct state and the orchestrator rejects it. The orchestrator uses this distinction for HTTP disposition. Complete footprint tags must already belong to the published value; the orchestrator does not perform a post-return overwrite.
 
-The provider must be thread-safe and preserve generic values, cancellation, null/negative-cache payloads, named-instance isolation, configured namespaces, and tag invalidation. It must not rebuild HTTP vary material. `SetAsync` is an implementor-facing overwrite used only after a successfully materialized factory expands the early footprint; providers must replace both value and tag metadata. A provider that cannot support named instances should reject non-default `DataCacheInstances` during options validation instead of silently sharing one store.
+The provider must be thread-safe and preserve generic values, cancellation, null/negative-cache payloads, named-instance isolation, configured namespaces, and tag invalidation. It must not rebuild HTTP vary material. `SetAsync` is an implementer-facing explicit overwrite; providers must replace both value and tag metadata. A provider that cannot support named instances should reject non-default `DataCacheInstances` during options validation instead of silently sharing one store.
 
 `DataCacheInvalidationRequest` deliberately groups `Tags` and optional `InstanceName` into one operation. New optional provider features should be introduced as separate capability interfaces instead of growing `IDataCacheProvider` with unrelated members.
 
@@ -319,6 +320,10 @@ Provider name and capabilities are exposed in health-check data and the Admin AP
 Register exactly one provider. Core registration uses `TryAddSingleton`, so an application-owned provider can be registered first:
 
 ```csharp
+builder.Services.AddSingleton<IDataCacheProvider, MyDataCacheProvider>();
+builder.Services.AddCacheOrchestratorCore(builder.Configuration);
+
+// Contract skeleton: supply the engine's storage and concurrency implementation.
 public sealed class MyDataCacheProvider : IDataCacheProvider
 {
     public string Name => "MyEngine";
@@ -329,11 +334,18 @@ public sealed class MyDataCacheProvider : IDataCacheProvider
         CancellationToken cancellationToken = default)
         => /* read or materialize; Outcome = Cached | Materialized | Stale */ default;
 
+    public ValueTask<DataCacheProviderResult<T>> GetOrCreateWithTagsAsync<T>(
+        DataCacheProviderRequest request,
+        Func<CancellationToken, ValueTask<T>> factory,
+        Func<T, IReadOnlyList<string>> tagSelector,
+        CancellationToken cancellationToken = default)
+        => /* select tags inside each factory execution, before publication */ default;
+
     public ValueTask SetAsync<T>(
         DataCacheProviderRequest request,
         T value,
         CancellationToken cancellationToken = default)
-        => /* overwrite value + tags after footprint expansion */ default;
+        => /* explicitly overwrite value + tags together */ default;
 
     public ValueTask InvalidateAsync(
         DataCacheInvalidationRequest request,
@@ -341,8 +353,6 @@ public sealed class MyDataCacheProvider : IDataCacheProvider
         => /* remove all request.Tags for InstanceName or all instances */ default;
 }
 
-builder.Services.AddSingleton<IDataCacheProvider, MyDataCacheProvider>();
-builder.Services.AddCacheOrchestratorCore(builder.Configuration);
 ```
 
 An HTTP host can use `AddCacheOrchestratorAspNetCore` in the second line; it includes the Core registration and adds the HTTP surfaces.
@@ -360,12 +370,6 @@ A package can add settings to the Admin runtime catalog:
 3. Register an `IDomainSettingsPatchContributor` that owns and applies those setting IDs.
 
 ```csharp
-public sealed class MyEngineDomainSettings
-{
-    [DomainSetting(Kind = DomainSettingValueKind.IntSeconds, RuntimeOverlay = true, Group = "MyEngine")]
-    public int? SoftLimitSeconds { get; set; }
-}
-
 // during package registration:
 DomainSettingCatalog.RegisterSection(
     builder.Services, typeof(MyEngineDomainSettings),
@@ -373,6 +377,12 @@ DomainSettingCatalog.RegisterSection(
     propertyPrefix: "myEngine");
 
 builder.Services.AddSingleton<IDomainSettingsPatchContributor, MyEngineSettingsPatchContributor>();
+
+public sealed class MyEngineDomainSettings
+{
+    [DomainSetting(Kind = DomainSettingValueKind.IntSeconds, RuntimeOverlay = true, Group = "MyEngine")]
+    public int? SoftLimitSeconds { get; set; }
+}
 
 public sealed class MyEngineSettingsPatchContributor : IDomainSettingsPatchContributor
 {
@@ -382,7 +392,10 @@ public sealed class MyEngineSettingsPatchContributor : IDomainSettingsPatchContr
     public void Prepare(DomainSettingsPatchContext context, IReadOnlyDictionary<string, JsonElement> settings)
     {
         MyEngineOverlay current = context.Get<MyEngineOverlay>() ?? new();
-        int seconds = settings["myEngine.softLimitSeconds"].GetInt32();
+        if (!settings.TryGetValue("myEngine.softLimitSeconds", out JsonElement value))
+            return;
+        if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt32(out int seconds))
+            throw new ArgumentException("SoftLimitSeconds must be an integer.");
         context.Set(current with { SoftLimitSeconds = seconds });
     }
 

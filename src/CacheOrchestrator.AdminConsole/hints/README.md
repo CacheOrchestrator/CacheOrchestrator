@@ -32,7 +32,7 @@ In Docker, keep **`core-hints.json` in the image** (do not mount over all of `/a
 - [Step-by-step: add a new rule](#step-by-step-add-a-new-rule)
 - [Document shape](#document-shape)
 - [Fact paths (allowlist)](#fact-paths-allowlist)
-- [Settings UI & API](#settings-ui-api)
+- [Settings UI & API](#settings-ui--api)
 - [Design checklist](#design-checklist)
 
 ## Why customize
@@ -50,11 +50,13 @@ Default rules cover common factory-share (also known as origin), **impact** (poo
 In Admin Console App `appsettings` (or environment overrides):
 
 ```json
-"AdminConsole": {
-  "Hints": {
-    "RuleFiles": [ "hints/*.json" ],
-    "DisabledCodes": [],
-    "DisabledStatePath": "hints/disabled.local.json"
+{
+  "AdminConsole": {
+    "Hints": {
+      "RuleFiles": [ "hints/*.json" ],
+      "DisabledCodes": [],
+      "DisabledStatePath": "hints/disabled.local.json"
+    }
   }
 }
 ```
@@ -62,9 +64,11 @@ In Admin Console App `appsettings` (or environment overrides):
 Production / Docker defaults use the operator data directory instead:
 
 ```json
-"Hints": {
-  "RuleFiles": [ "data/rules/*.json" ],
-  "DisabledStatePath": "data/disabled.local.json"
+{
+  "Hints": {
+    "RuleFiles": [ "data/rules/*.json" ],
+    "DisabledStatePath": "data/disabled.local.json"
+  }
 }
 ```
 

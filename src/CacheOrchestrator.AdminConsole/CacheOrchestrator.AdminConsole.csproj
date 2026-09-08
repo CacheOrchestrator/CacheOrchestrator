@@ -5,7 +5,6 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <LangVersion>latest</LangVersion>
     <RootNamespace>CacheOrchestrator.AdminConsole</RootNamespace>
     <AssemblyName>CacheOrchestrator.AdminConsole</AssemblyName>
     <Description>CacheOrchestrator Admin Console multi-instance fan-out UI over the Admin API on each application instance.</Description>

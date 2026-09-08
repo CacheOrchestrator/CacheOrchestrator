@@ -16,8 +16,8 @@ A **domain** is a named group of data (`products`, `reports`, …) with its own 
 - [High-level diagram](#high-level-diagram)
 - [Source layout (`src/`)](#source-layout-src)
 - [Public API surface](#public-api-surface)
-- [Request flow — Output Cache](#request-flow-output-cache)
-- [Request flow — Data Cache](#request-flow-data-cache)
+- [Request flow — Output Cache](#request-flow--output-cache)
+- [Request flow — Data Cache](#request-flow--data-cache)
 - [Backends](#backends)
 
 ## Design principles

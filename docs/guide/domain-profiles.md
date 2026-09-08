@@ -13,7 +13,7 @@ The same application can use both profiles. Give them separate domains because t
 
 - [Choose the freshness boundary first](#choose-the-freshness-boundary-first)
 - [Snapshot profile](#snapshot-profile)
-- [Dynamic / CRUD profile](#dynamic-crud-profile)
+- [Dynamic / CRUD profile](#dynamic--crud-profile)
 - [Collections and related data](#collections-and-related-data)
 - [Choose an ETag policy deliberately](#choose-an-etag-policy-deliberately)
 - [Account for authenticated traffic](#account-for-authenticated-traffic)

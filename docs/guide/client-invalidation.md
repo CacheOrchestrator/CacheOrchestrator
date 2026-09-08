@@ -50,14 +50,16 @@ This is a cache-freshness policy, not a guarantee that a session reads an immuta
 Replace the quick start's `catalog` domain with the following snapshot policy. Retain its root provider/namespace settings.
 
 ```json
-"catalog": {
-  "Version": "2026-09",
-  "IgnoreQueryKeys": ["co_v"],
-  "DataCache": { "TtlSeconds": 3600 },
-  "OutputCache": { "TtlSeconds": 300 },
-  "ClientCache": {
-    "Cacheability": "Public",
-    "TtlSeconds": 86400
+{
+  "catalog": {
+    "Version": "2026-09",
+    "IgnoreQueryKeys": ["co_v"],
+    "DataCache": { "TtlSeconds": 3600 },
+    "OutputCache": { "TtlSeconds": 300 },
+    "ClientCache": {
+      "Cacheability": "Public",
+      "TtlSeconds": 86400
+    }
   }
 }
 ```
@@ -171,11 +173,13 @@ The example progresses from refreshing the current user's screen after a save to
 Add this domain beside `catalog`:
 
 ```json
-"product": {
-  "Version": "1",
-  "DataCache": { "TtlSeconds": 300 },
-  "OutputCache": { "TtlSeconds": 120 },
-  "ClientCache": { "Cacheability": "NoStore" }
+{
+  "product": {
+    "Version": "1",
+    "DataCache": { "TtlSeconds": 300 },
+    "OutputCache": { "TtlSeconds": 120 },
+    "ClientCache": { "Cacheability": "NoStore" }
+  }
 }
 ```
 

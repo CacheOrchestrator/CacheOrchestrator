@@ -14,9 +14,9 @@ For “which package do I need?”, start with [packages](../guide/packages.md),
 
 - [Root shape](#root-shape)
 - [Root properties and package ownership](#root-properties-and-package-ownership)
-- [Provider options (`OutputCache` / `DataCacheInstances` entry)](#provider-options-outputcache-datacacheinstances-entry)
+- [Provider options (`OutputCache` / `DataCacheInstances` entry)](#provider-options-outputcache--datacacheinstances-entry)
 - [Redis connection (`CacheOrchestrator.Redis` package)](#redis-connection-cacheorchestratorredis-package)
-- [Edge cache (`CacheOrchestrator.Edge` package)](#edge-cache-cacheorchestrator-edge-package)
+- [Edge cache (`CacheOrchestrator.Edge` package)](#edge-cache-cacheorchestratoredge-package)
 - [Distributed resilience (`Cache:Distributed`)](#distributed-resilience-cachedistributed)
 - [Domain settings (`DomainDefaults` and each `Domains` entry)](#domain-settings-domaindefaults-and-each-domains-entry)
 - [Admin API (`Cache:Admin`)](#admin-api-cacheadmin)
