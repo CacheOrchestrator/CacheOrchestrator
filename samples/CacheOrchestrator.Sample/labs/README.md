@@ -20,12 +20,12 @@ For a single process on your machine without Docker, use the [Playground sample]
 ## Table of Contents
 
 - [Experiment (this is the point)](#experiment-this-is-the-point)
-- [Stage 01 — Observability](#stage-01-observability)
-- [Stage 02 — Redis as Fusion L2](#stage-02-redis-as-fusion-l2)
-- [Stage 03 — Two playgrounds + shared Redis L2](#stage-03-two-playgrounds-shared-redis-l2)
-- [Stage 04 — Cluster bus](#stage-04-cluster-bus)
-- [Stage 05 — OC Redis + FC Redis + Cluster bus](#stage-05-oc-redis-fc-redis-cluster-bus)
-- [Stage 06 — Varnish Edge](#stage-06-varnish-edge)
+- [Stage 01 — Observability](#stage-01--observability)
+- [Stage 02 — Redis as Fusion L2](#stage-02--redis-as-fusion-l2)
+- [Stage 03 — Two playgrounds + shared Redis L2](#stage-03--two-playgrounds--shared-redis-l2)
+- [Stage 04 — Cluster bus](#stage-04--cluster-bus)
+- [Stage 05 — OC Redis + FC Redis + Cluster bus](#stage-05--oc-redis--fc-redis--cluster-bus)
+- [Stage 06 — Varnish Edge](#stage-06--varnish-edge)
 - [Lab vs production](#lab-vs-production)
 - [Troubleshooting](#troubleshooting)
 - [Where to read more](#where-to-read-more)

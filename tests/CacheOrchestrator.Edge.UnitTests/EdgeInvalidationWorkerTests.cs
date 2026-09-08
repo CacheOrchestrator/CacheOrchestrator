@@ -1,7 +1,7 @@
 using CacheOrchestrator.Edge.Configuration;
 using CacheOrchestrator.Edge.Invalidation;
 using CacheOrchestrator.Edge.Providers;
-using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
@@ -18,10 +18,10 @@ public class EdgeInvalidationWorkerTests
 
         await sut.StartAsync(TestContext.Current.CancellationToken);
         await channel.Channel.Writer.WriteAsync(
-            new EdgeInvalidationJob("edge", provider.Name, ["a", "b"]),
+            new EdgeInvalidationJob(new EdgeInvalidationTarget("edge", provider.Name, "edge", new Dictionary<string, string>()), ["a", "b"]),
             TestContext.Current.CancellationToken);
         await channel.Channel.Writer.WriteAsync(
-            new EdgeInvalidationJob("edge", provider.Name, ["b", "c"]),
+            new EdgeInvalidationJob(new EdgeInvalidationTarget("edge", provider.Name, "edge", new Dictionary<string, string>()), ["b", "c"]),
             TestContext.Current.CancellationToken);
         await WaitUntilAsync(() => provider.Requests.Count == 2);
         await sut.StopAsync(TestContext.Current.CancellationToken);
@@ -45,7 +45,7 @@ public class EdgeInvalidationWorkerTests
 
         await sut.StartAsync(TestContext.Current.CancellationToken);
         await channel.Channel.Writer.WriteAsync(
-            new EdgeInvalidationJob("edge", provider.Name, ["a"]),
+            new EdgeInvalidationJob(new EdgeInvalidationTarget("edge", provider.Name, "edge", new Dictionary<string, string>()), ["a"]),
             TestContext.Current.CancellationToken);
         await WaitUntilAsync(() => provider.Requests.Count == 2);
         await sut.StopAsync(TestContext.Current.CancellationToken);
@@ -102,6 +102,9 @@ public class EdgeInvalidationWorkerTests
         };
 
         public ConcurrentQueue<EdgeInvalidationRequest> Requests { get; } = new();
+
+        public EdgeInvalidationTarget CaptureTarget(string instanceName, IConfigurationSection instanceConfiguration) =>
+            new(instanceName, Name, instanceName, new Dictionary<string, string>());
 
         public ValueTask<EdgeInvalidationResult> InvalidateAsync(
             EdgeInvalidationRequest request,

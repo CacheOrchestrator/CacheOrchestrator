@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
-using Microsoft.Net.Http.Headers;
 
 namespace CacheOrchestrator.Utilities;
 
@@ -102,148 +101,34 @@ internal static class HttpHelper
         response.Headers.Pragma = "no-cache";
     }
 
-    public static void NormalizeAcceptEncoding(HttpContext http, string[] allowedEncodings) =>
-        NormalizePreferHeader(
-            http.Request.Headers,
-            HeaderNames.AcceptEncoding,
-            allowedEncodings,
-            languageRange: false);
-
     /// <summary>
-    /// Collapses <c>Accept</c> to the first prefer-list media type that appears as a
-    /// comma-separated type (parameters after <c>;</c> ignored).
-    /// <c>application/json-seq</c> does not match <c>application/json</c>.
-    /// Clears the header when none match.
+    /// Canonicalizes a single parameter-free negotiation token without selecting a representation.
+    /// Composite values remain intact: only the endpoint knows its formatter, compression, and
+    /// localization rules. In particular, never discard exclusions, wildcards, or regional subtags.
     /// </summary>
-    public static void NormalizeAccept(HttpContext http, string[] preferredMediaTypes) =>
-        NormalizePreferHeader(
-            http.Request.Headers,
-            HeaderNames.Accept,
-            preferredMediaTypes,
-            languageRange: false);
-
-    /// <summary>
-    /// Collapses <c>Accept-Language</c> to the first prefer-list tag that matches a
-    /// comma-separated language tag (parameters after <c>;</c> ignored).
-    /// A prefer tag without a hyphen also matches more specific tags (<c>en</c> → <c>en-US</c>).
-    /// Clears the header when none match.
-    /// </summary>
-    public static void NormalizeAcceptLanguage(HttpContext http, string[] preferredLanguages) =>
-        NormalizePreferHeader(
-            http.Request.Headers,
-            HeaderNames.AcceptLanguage,
-            preferredLanguages,
-            languageRange: true);
-
-    private static void NormalizePreferHeader(
-        IHeaderDictionary headers,
-        string headerName,
-        string[] preferred,
-        bool languageRange)
+    internal static string NormalizeNegotiationHeader(StringValues current, string[] canonicalValues)
     {
-        if (preferred.Length == 0 || !headers.TryGetValue(headerName, out StringValues current) || current.Count == 0)
-            return;
+        if (current.Count != 1)
+            return current.ToString();
 
-        for (int i = 0; i < preferred.Length; i++)
-        {
-            string item = preferred[i];
-            if (string.IsNullOrWhiteSpace(item))
-                continue;
-            string trimmed = item.Trim();
-            if (HeaderMatchesPrefer(current, trimmed, languageRange))
-            {
-                headers[headerName] = trimmed;
-                return;
-            }
-        }
-
-        headers[headerName] = string.Empty;
-    }
-
-    internal static string ResolvePreferredHeader(
-        StringValues current,
-        string[] preferred,
-        bool languageRange)
-    {
-        if (preferred.Length == 0 || current.Count == 0)
+        string? value = current[0];
+        if (string.IsNullOrEmpty(value))
             return string.Empty;
 
-        for (int i = 0; i < preferred.Length; i++)
+        ReadOnlySpan<char> token = value.AsSpan().Trim();
+        if (token.IndexOfAny(',', ';', '*') >= 0)
+            return value;
+
+        for (int i = 0; i < canonicalValues.Length; i++)
         {
-            string item = preferred[i];
-            if (string.IsNullOrWhiteSpace(item))
-                continue;
-
-            string trimmed = item.Trim();
-            if (HeaderMatchesPrefer(current, trimmed, languageRange))
-                return trimmed;
-        }
-
-        return string.Empty;
-    }
-
-    private static bool HeaderMatchesPrefer(StringValues header, string preferred, bool languageRange)
-    {
-        for (int i = 0; i < header.Count; i++)
-        {
-            string? value = header[i];
-            if (value is not null && ValueMatchesPrefer(value, preferred, languageRange))
-                return true;
-        }
-
-        return false;
-    }
-
-    private static bool ValueMatchesPrefer(string value, string preferred, bool languageRange)
-    {
-        int start = 0;
-        int length = value.Length;
-        while (start < length)
-        {
-            while (start < length && (value[start] is ' ' or '\t' or ','))
-                start++;
-            if (start >= length)
-                break;
-
-            int comma = value.IndexOf(',', start);
-            int partEnd = comma < 0 ? length : comma;
-
-            int tokenEnd = start;
-            while (tokenEnd < partEnd && value[tokenEnd] is not (';' or ' ' or '\t'))
-                tokenEnd++;
-
-            int tokenLen = tokenEnd - start;
-            if (tokenLen > 0
-                && PreferTokenEquals(value, start, tokenLen, preferred, languageRange))
+            string? candidate = canonicalValues[i];
+            if (!string.IsNullOrWhiteSpace(candidate)
+                && token.Equals(candidate.AsSpan().Trim(), StringComparison.OrdinalIgnoreCase))
             {
-                return true;
+                return candidate.Trim();
             }
-
-            start = partEnd + 1;
         }
 
-        return false;
-    }
-
-    private static bool PreferTokenEquals(
-        string value,
-        int start,
-        int tokenLen,
-        string preferred,
-        bool languageRange)
-    {
-        if (tokenLen == preferred.Length
-            && string.Compare(value, start, preferred, 0, tokenLen, StringComparison.OrdinalIgnoreCase) == 0)
-        {
-            return true;
-        }
-
-        if (!languageRange || preferred.Contains('-', StringComparison.Ordinal))
-            return false;
-
-        // en matches en-US; does not match ena
-        return tokenLen > preferred.Length + 1
-            && value[start + preferred.Length] == '-'
-            && string.Compare(value, start, preferred, 0, preferred.Length, StringComparison.OrdinalIgnoreCase) == 0;
+        return value;
     }
 }

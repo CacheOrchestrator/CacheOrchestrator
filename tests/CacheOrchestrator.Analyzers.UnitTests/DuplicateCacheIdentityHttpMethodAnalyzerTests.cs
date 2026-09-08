@@ -117,6 +117,49 @@ public sealed class DuplicateCacheIdentityHttpMethodAnalyzerTests
                 .WithArguments("POST", "C.M"));
     }
 
+    [Fact]
+    public async Task UnrelatedShortNames_AreIgnoredEvenAlongsideActualIdentity()
+    {
+        await RunAsync("""
+            using CacheOrchestrator.Identity;
+            namespace Other
+            {
+                [System.AttributeUsage(System.AttributeTargets.Method, AllowMultiple = true)]
+                public sealed class CacheIdentityAttribute : System.Attribute
+                {
+                    public CacheIdentityAttribute(string[] methods) { }
+                }
+                [System.AttributeUsage(System.AttributeTargets.Method, AllowMultiple = true)]
+                public sealed class ContentHashCacheIdentityAttribute : System.Attribute
+                {
+                    public ContentHashCacheIdentityAttribute(string[] methods) { }
+                }
+            }
+            class C
+            {
+                [CacheIdentity(new[] { "GET" }, "url")]
+                [Other.CacheIdentity(new[] { "GET", "GET" })]
+                [Other.ContentHashCacheIdentity(new[] { "GET", "GET" })]
+                void M() { }
+            }
+            """);
+    }
+
+    [Fact]
+    public async Task AliasedActualAttribute_StillReportsDuplicates()
+    {
+        await RunAsync("""
+            using Identity = CacheOrchestrator.Identity.CacheIdentityAttribute;
+            class C
+            {
+                [Identity(new[] { "GET" }, "a")]
+                [{|#0:Identity(new[] { "get" }, "b")|}]
+                void M() { }
+            }
+            """, DiagnosticResult.CompilerError(DuplicateCacheIdentityHttpMethodAnalyzer.DiagnosticId)
+                .WithLocation(0).WithArguments("GET", "C.M"));
+    }
+
     private static async Task RunAsync(string source, params DiagnosticResult[] expected)
     {
         var test = new CSharpAnalyzerTest<DuplicateCacheIdentityHttpMethodAnalyzer, DefaultVerifier>

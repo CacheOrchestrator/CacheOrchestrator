@@ -87,7 +87,7 @@ public class VarnishEdgeProviderTests
 
         EdgeInvalidationResult result = await sut.InvalidateAsync(new EdgeInvalidationRequest
         {
-            InstanceName = "edge",
+            Target = sut.CaptureTarget("edge", TargetConfiguration()),
             Tags = ["coe1-a", "coe1-b"]
         }, TestContext.Current.CancellationToken);
 
@@ -103,31 +103,11 @@ public class VarnishEdgeProviderTests
         var client = new HttpClient(handler);
         IHttpClientFactory factory = Substitute.For<IHttpClientFactory>();
         factory.CreateClient(VarnishEdgeProvider.HttpClientName).Returns(client);
-        var monitor = new TestOptionsMonitor(new VarnishEdgeConfiguration
-        {
-            EdgeInstances = new Dictionary<string, VarnishEdgeInstanceContainer>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["edge"] = new()
-                {
-                    Varnish = new VarnishEdgeInstanceOptions
-                    {
-                        PurgeUrl = "http://varnish/cache-orchestrator/purge",
-                        ApiKey = "secret",
-                        ApiKeyHeaderName = "X-Edge-Key"
-                    }
-                }
-            }
-        });
-        return new VarnishEdgeProvider(factory, monitor);
+        return new VarnishEdgeProvider(factory);
     }
 
-    private sealed class TestOptionsMonitor(VarnishEdgeConfiguration value)
-        : IOptionsMonitor<VarnishEdgeConfiguration>
-    {
-        public VarnishEdgeConfiguration CurrentValue => value;
-        public VarnishEdgeConfiguration Get(string? name) => value;
-        public IDisposable? OnChange(Action<VarnishEdgeConfiguration, string?> listener) => null;
-    }
+    private static IConfigurationSection TargetConfiguration() =>
+        new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["edge:Varnish:PurgeUrl"] = "http://varnish/cache-orchestrator/purge", ["edge:Varnish:ApiKey"] = "secret", ["edge:Varnish:ApiKeyHeaderName"] = "X-Edge-Key" }).Build().GetSection("edge");
 
     private sealed class RecordingHandler : HttpMessageHandler
     {

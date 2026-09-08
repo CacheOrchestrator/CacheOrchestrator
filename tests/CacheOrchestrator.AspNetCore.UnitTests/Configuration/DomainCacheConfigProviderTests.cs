@@ -233,7 +233,7 @@ public class DomainCacheConfigProviderTests
         cfg.DataCacheTtl.Should().Be(TimeSpan.FromSeconds(3800));
         cfg.EncodingNormalizationList.Should().Equal("br", "gzip");
         cfg.VaryByAccept.Should().BeTrue();
-        cfg.AcceptNormalizationList.Should().Equal("application/json", "application/xml");
+        cfg.AcceptNormalizationList.Should().BeNull();
         cfg.DataCacheRespectAuthBypass.Should().BeTrue();
         cfg.DataCacheRespectNoStore.Should().BeTrue();
         cfg.DataCacheVaryOnEncoding.Should().BeTrue();

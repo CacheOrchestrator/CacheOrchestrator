@@ -14,9 +14,9 @@ For “which package do I need?”, start with [packages](../guide/packages.md),
 
 - [Root shape](#root-shape)
 - [Root properties and package ownership](#root-properties-and-package-ownership)
-- [Provider options (`OutputCache` / `DataCacheInstances` entry)](#provider-options-outputcache-datacacheinstances-entry)
+- [Provider options (`OutputCache` / `DataCacheInstances` entry)](#provider-options-outputcache--datacacheinstances-entry)
 - [Redis connection (`CacheOrchestrator.Redis` package)](#redis-connection-cacheorchestratorredis-package)
-- [Edge cache (`CacheOrchestrator.Edge` package)](#edge-cache-cacheorchestrator-edge-package)
+- [Edge cache (`CacheOrchestrator.Edge` package)](#edge-cache-cacheorchestratoredge-package)
 - [Distributed resilience (`Cache:Distributed`)](#distributed-resilience-cachedistributed)
 - [Domain settings (`DomainDefaults` and each `Domains` entry)](#domain-settings-domaindefaults-and-each-domains-entry)
 - [Admin API (`Cache:Admin`)](#admin-api-cacheadmin)
@@ -186,7 +186,7 @@ For one domain, the Core and ASP.NET Core options providers resolve values in th
 3. `Cache:DomainDefaults`.
 4. Library defaults.
 
-`CacheOrchestrator.Core` produces an immutable `DomainCacheOptions` snapshot for domain identity and Data Cache policy. `CacheOrchestrator.AspNetCore` composes it into `DomainHttpCacheOptions` for Output Cache, Client Cache, authentication, vary, ETag, and HTTP Data Cache key policy. A request reuses its HTTP snapshot; configuration reloads and later overlays affect newly resolved requests, not values already attached to the current request. Provider and connection sections such as `OutputCache`, `DataCacheInstances`, and `Redis` are host composition settings and do not participate in this per-domain merge.
+`CacheOrchestrator.Core` produces an immutable `DomainCacheOptions` snapshot for domain identity and Data Cache policy. `CacheOrchestrator.AspNetCore` composes it into `DomainHttpCacheOptions` for Output Cache, Client Cache, authentication, vary, ETag, and HTTP Data Cache key policy. A request reuses its HTTP snapshot; configuration reloads and later overlays affect newly resolved requests, not values already attached to the current request. Core, HTTP and Fusion replace their snapshot-cache generation on reload. Resolutions already in flight may finish against the previous generation, but cannot repopulate the current generation with stale settings. Provider and connection sections such as `OutputCache`, `DataCacheInstances`, and `Redis` are host composition settings and do not participate in this per-domain merge.
 
 ### Domain-setting change activation and invalidation
 
@@ -211,7 +211,7 @@ The Admin settings PATCH accepts `applyImmediately: true` for the optional actio
 | `DataCache.Enabled`, `OutputCache.Enabled` | Disabling bypasses the layer immediately, but retained entries expire naturally | Disabling also evicts that domain from the affected layer; enabling does not evict |
 | `DataCache.Instance` | New requests use the new instance; entries in the old instance expire naturally | Same |
 | `DataCache.TtlSeconds`, `OutputCache.TtlSeconds` | Existing entries retain their creation TTL | A decrease evicts the affected domain layer once; an increase does not |
-| `FusionCache.HardTtlSeconds`, `FailSafeSeconds`, `JitterSeconds`, `MaxItemBytes` | Existing entries retain their creation policy | A decrease evicts the domain from Data Cache once; an increase does not |
+| `FusionCache.HardTtlSeconds`, `FailSafeSeconds`, `JitterSeconds` | Existing entries retain their creation policy | A decrease evicts the domain from Data Cache once; an increase does not |
 | Other `FusionCache` settings | Affect subsequent cache operations/factories; existing entries expire naturally | No additional invalidation |
 | `OutputCache.ETagMode` | Existing OC/Edge responses retain their original ETag until expiration | Evicts OC and purges enabled Edge |
 | `OutputCache.CacheableStatusCodes` | Affects new storage decisions; existing responses expire naturally | Not runtime-patchable; no additional reload invalidation |
@@ -248,7 +248,7 @@ If an operator needs stronger semantics than the automatic or optional rules pro
 | `VaryByAuthClaims` | null | Claim types for auth-user material |
 | `DataCacheRespectAuthBypass` | **true** | Data Cache skips when the Output Cache authentication bypass would fire. Set `false` only for caller-independent shared data. |
 | `VaryByAccept` / `VaryByAcceptLanguage` | true / false | Content negotiation / locale vary |
-| `AcceptNormalizationList` / `AcceptLanguageNormalizationList` | null | Prefer-lists when those vary flags are on — [vary.md](vary.md) |
+| `AcceptNormalizationList` / `AcceptLanguageNormalizationList` | null (raw header) | Canonical single-token spellings; composite negotiation, quality, wildcards, and parameters remain intact — [vary.md](vary.md) |
 | `VaryByHeaders` / `VaryByCookies` | null | Header/cookie **name** allowlists — [vary.md](vary.md) |
 | `VaryByQueryKeys` | null | `null` = all non-tracking query keys; `[]` = none; non-empty = allowlist |
 | `IgnoreQueryKeys` | null | Extra deny list on top of built-in tracking prefixes |
@@ -298,7 +298,7 @@ Same JSON object as portable `DataCache`; bound by `CacheOrchestrator.AspNetCore
 | `Cacheability` | `Public` | `Public`, `Private`, `NoStore` |
 | `TtlSeconds` | `3600` | Target max-age far from schedule; `0` emits `max-age=0` and disables the schedule ramp |
 | `TtlMinSeconds` | `60` | Floor max-age near/at update and during hold; also the enabled Edge fresh-TTL floor, clamped to the Edge maximum; `0` is valid and the value is ignored when `TtlSeconds` is `0` |
-| `ScheduledUpdateUtc` | null | Planned cutover; linear ramp of client and enabled Edge fresh TTLs toward min; changes apply to subsequent responses without an Edge purge |
+| `ScheduledUpdateUtc` | null | Planned cutover; linear ramp of client and enabled Edge fresh TTLs toward min; changes normally apply to subsequent responses; moving the schedule earlier with `ApplyImmediately` also purges Edge |
 | `MustRevalidateNearUpdate` | false | Append `must-revalidate` at min floor |
 | `ForcePrivateWhenAuthenticated` | true | Force client Private for signed-in Identity + Public |
 
@@ -310,15 +310,20 @@ Bound from `Cache:DomainDefaults:FusionCache` / `Cache:Domains:{name}:FusionCach
 
 | Property | Default* | Description |
 |----------|----------|-------------|
-| `HardTtlSeconds` | `43200` | Caps soft/`DataCache.TtlSeconds` if soft &gt; hard |
-| `FailSafeSeconds` | `86400` | Fail-safe max duration (seconds) |
+| `HardTtlSeconds` | `43200` | Caps base `DataCache.TtlSeconds`; 0 disables this cap. It does not cap jitter or fail-safe retention |
+| `FailSafeSeconds` | `86400` | Total fail-safe retention horizon from materialization, not an additional stale duration; 0 disables fail-safe. When enabled, must be at least the capped base Data Cache duration |
 | `EagerRefreshRatio` | 0.9 | Eager refresh threshold. **`0` = disabled**; values in `(0, 1)` allowed; `>= 1` fails validation |
 | `JitterSeconds` | `60` | Max jitter on duration (seconds) |
 | `FactorySoftTimeoutSeconds` | `1` | Factory soft timeout (seconds) |
 | `FactoryHardTimeoutSeconds` | `5` | Factory hard timeout (seconds) |
-| `MaxItemBytes` | 0 | Memory size limit; 0 = unlimited |
 | `AllowBackgroundDistributed` | true | Fusion may complete L2 I/O in the background |
 | `AllowBackgroundBackplane` | true | Fusion may publish backplane messages in the background |
+
+`MaxItemBytes` and its runtime-overlay key were removed for 3.0. The beta setting assigned a fixed native cache weight; it never measured or limited payload bytes. Remove it from configuration (including a value of `0`); Fusion configuration validation rejects the old key. CacheOrchestrator exposes no replacement size setting or size-limit capability. Applications that require memory budgets must configure and own them through the underlying cache engine. The native [memory-cache size contract](https://learn.microsoft.com/en-us/aspnet/core/performance/caching/memory#use-setsize-size-and-sizelimit-to-limit-cache-size) uses application-defined units.
+
+## Resolved runtime snapshots
+
+Resolved `DomainCacheOptions`, `DomainHttpCacheOptions` and provider-returned `DomainFusionCacheSettings` are shared snapshots. Treat them as immutable: create a new value or use configuration/runtime management to change policy. HTTP collection properties expose `IReadOnlyList<T>` and copy input at initialization; they retain the difference between a null query allowlist (all eligible keys) and an empty one (no keys). Public collection reads do not clone data. Fusion settings use init-only scalar properties, which continue to support configuration binding. Custom providers and contributors must not mutate request tag collections or retain mutable sections in the runtime store.
 
 ## Admin API (`Cache:Admin`)
 

@@ -18,7 +18,7 @@ internal static class DomainSettingsPatchMapper
         TimeSpan? ttl = null;
         foreach ((string rawKey, JsonElement value) in settings)
         {
-            DomainSettingCatalogEntry entry = DomainSettingCatalog.Find(rawKey)
+            DomainSettingCatalogEntry entry = DomainSettingCatalog.Core.Find(rawKey)
                 ?? throw new ArgumentException($"Unknown domain setting '{rawKey}'.", nameof(settings));
             if (!entry.RuntimeOverlay)
                 throw new ArgumentException($"Setting '{entry.Id}' is not runtime-patchable.", nameof(settings));

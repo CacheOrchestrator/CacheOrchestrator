@@ -199,8 +199,11 @@ This keeps Output Cache in memory and moves the Fusion Data Cache L2 and backpla
 A domain is a named set of cache rules: lifetimes, which layers to use, and how they are backed. For example, in a fleet tracking application, different types of data require different cache configurations:
 
 - **Static mapping assets** may change once a year. Long Output Cache and Client Cache lifetimes are enough; Data Cache is optional.
+
 - **Map tiles and batched datasets** change on a published schedule. Client and enabled Edge lifetimes can stay long during the calm period and automatically shorten as the cutover approaches. The [Client Cache Schedule](docs/guide/client-cache-schedule.md) coordinates that countdown without changing Output Cache or Data Cache TTLs.
+
 - **Fleet telemetry** ages in minutes. A short lifetime, in-memory Output Cache, and a shared Redis Data Cache with a backplane keep several instances consistent.
+
 - **Live vehicle positions** age in seconds. FusionCache locking and fail-safe stop a stampede when many callers miss at once; Output Cache stays off or very short.
 
 The endpoint code is the same shape in every case. The domain is what differs.
@@ -253,13 +256,13 @@ The library is **modular**. `CacheOrchestrator.Core` provides the foundational p
 ## Prerelease status
 
 > [!IMPORTANT]
-> CacheOrchestrator v3 is a **full redesign**, not an incremental evolution of 1.x / 2.x. Previous published lines (v1.0.0 and v2.1.x) are maintained for legacy continuity only. The v3 does not preserve a direct migration story or API compatibility with them; please treat v3 as a new architectural surface under the same name.
+> CacheOrchestrator v3 is a **full redesign**, not an incremental evolution of 1.x / 2.x. Previously published versions (v1.0.0 and v2.1.x) remain available for existing applications. v3 does not preserve API compatibility or offer a drop-in upgrade path; please treat it as a new architectural surface under the same name.
 >
->**v3 is in prerelease (beta)**
+> **Upgrading from 2.x or an earlier v3 beta** requires manual adaptation. Start with [Upgrading to 3.0](docs/guide/upgrading-to-3.md). It explains package composition, breaking API and configuration changes, cache namespaces, deployment, and rollback. Existing configurations and custom implementations will require review.
 >
-> This documentation describes **CacheOrchestrator v3**. Public APIs may change until the stable **v3.0.0** release. Install the prerelease with the Quick start above (`dotnet add package … --prerelease`).<br>
-> **Help test the prerelease.** Reports from real ASP.NET Core applications, standalone workers, Redis deployments, browsers, and playground labs are especially valuable. Successful results and confusing behavior are welcome too — see [Contributing](CONTRIBUTING.md#help-test-v3).<br>
-> To build from source or contribute code, clone this repository — `main` tracks the same v3 work and may move faster than the latest beta package.
+> **CacheOrchestrator v3 is in prerelease (beta).** Public APIs and behavior may change until the stable **3.0.0** release.
+>
+> **Help test the prerelease.** Reports from real ASP.NET Core applications, standalone workers, Redis deployments, browsers, and playground labs are highly appreciated — see [Contributing](CONTRIBUTING.md#help-test-v3). Note that repository documentation may describe changes newer than the latest published beta package.
 
 ---
 

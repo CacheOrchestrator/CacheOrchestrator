@@ -3,7 +3,6 @@ CacheOrchestrator.EFCore.CacheEntityAttribute
 CacheOrchestrator.EFCore.CacheEntityAttribute.CacheEntityAttribute(string! domain, string! entityKind) -> void
 CacheOrchestrator.EFCore.CacheEntityAttribute.Domain.get -> string!
 CacheOrchestrator.EFCore.CacheEntityAttribute.EntityKind.get -> string!
-CacheOrchestrator.EFCore.CacheInvalidationSaveChangesInterceptor
 CacheOrchestrator.EFCore.CacheOrchestratorEfCoreServiceExtensions
 CacheOrchestrator.EFCore.EfCoreInvalidationOptions
 CacheOrchestrator.EFCore.EfCoreInvalidationOptions.BulkThreshold.get -> int
@@ -19,12 +18,6 @@ CacheOrchestrator.EFCore.EfCoreOnBulk.Domain = 2 -> CacheOrchestrator.EFCore.EfC
 CacheOrchestrator.EFCore.EfCoreOnBulk.Entities = 0 -> CacheOrchestrator.EFCore.EfCoreOnBulk
 CacheOrchestrator.EFCore.EfCoreOnBulk.Kind = 1 -> CacheOrchestrator.EFCore.EfCoreOnBulk
 CacheOrchestrator.EFCore.EntityTypeBuilderExtensions
-override CacheOrchestrator.EFCore.CacheInvalidationSaveChangesInterceptor.SaveChangesFailed(Microsoft.EntityFrameworkCore.Diagnostics.DbContextErrorEventData! eventData) -> void
-override CacheOrchestrator.EFCore.CacheInvalidationSaveChangesInterceptor.SaveChangesFailedAsync(Microsoft.EntityFrameworkCore.Diagnostics.DbContextErrorEventData! eventData, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-override CacheOrchestrator.EFCore.CacheInvalidationSaveChangesInterceptor.SavedChanges(Microsoft.EntityFrameworkCore.Diagnostics.SaveChangesCompletedEventData! eventData, int result) -> int
-override CacheOrchestrator.EFCore.CacheInvalidationSaveChangesInterceptor.SavedChangesAsync(Microsoft.EntityFrameworkCore.Diagnostics.SaveChangesCompletedEventData! eventData, int result, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<int>
-override CacheOrchestrator.EFCore.CacheInvalidationSaveChangesInterceptor.SavingChanges(Microsoft.EntityFrameworkCore.Diagnostics.DbContextEventData! eventData, Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int> result) -> Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int>
-override CacheOrchestrator.EFCore.CacheInvalidationSaveChangesInterceptor.SavingChangesAsync(Microsoft.EntityFrameworkCore.Diagnostics.DbContextEventData! eventData, Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int> result, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int>>
 static CacheOrchestrator.EFCore.CacheOrchestratorEfCoreServiceExtensions.AddCacheOrchestratorEfCoreInvalidation(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration, System.Action<CacheOrchestrator.EFCore.EfCoreInvalidationOptions!>? configure = null, string! configSection = "Cache") -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static CacheOrchestrator.EFCore.CacheOrchestratorEfCoreServiceExtensions.AddCacheOrchestratorInvalidation(this Microsoft.EntityFrameworkCore.DbContextOptionsBuilder! options, System.IServiceProvider! services) -> Microsoft.EntityFrameworkCore.DbContextOptionsBuilder!
 static CacheOrchestrator.EFCore.CacheOrchestratorEfCoreServiceExtensions.AddEfCoreInvalidation<TBuilder>(this TBuilder builder, System.Action<CacheOrchestrator.EFCore.EfCoreInvalidationOptions!>? configure = null, string! configSection = "Cache") -> TBuilder

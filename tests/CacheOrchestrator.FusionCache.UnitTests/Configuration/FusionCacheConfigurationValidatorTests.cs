@@ -13,6 +13,8 @@ public sealed class FusionCacheConfigurationValidatorTests
     [InlineData("FactorySoftTimeoutSeconds", "5", "must be < FactoryHardTimeoutSeconds")]
     [InlineData("FactoryHardTimeoutSeconds", "0", "must be > 0")]
     [InlineData("FailSafeSeconds", "10", "effective Data Cache duration")]
+    [InlineData("MaxItemBytes", "0", "MaxItemBytes was removed")]
+    [InlineData("MaxItemBytes", "1024", "MaxItemBytes was removed")]
     public void Validate_RejectsInvalidEffectiveFusionSettings(
         string property,
         string value,

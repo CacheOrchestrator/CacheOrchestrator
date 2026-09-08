@@ -59,6 +59,13 @@ public class DomainOutputCachePolicyBenchmarks
     public StringValues CollectQueryKeysForOutputCache()
         => CacheVaryMaterializer.CollectQueryKeysForOutputCache(_queryMixed, _queryOpts);
 
+    [GlobalCleanup]
+    public void Cleanup()
+    {
+        ((ServiceProvider)_simple.HttpContext.RequestServices).Dispose();
+        ((ServiceProvider)_withQuery.HttpContext.RequestServices).Dispose();
+    }
+
     private static OutputCacheContext CreateContext(
         string path,
         Dictionary<string, StringValues>? query = null)
@@ -98,6 +105,7 @@ public class DomainOutputCachePolicyBenchmarks
         services.AddSingleton<IRequestDomainCacheOptions>(provider);
         services.AddSingleton(typeof(ILogger<DomainOutputCachePolicy>), NullLogger<DomainOutputCachePolicy>.Instance);
         services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<CacheVaryMaterializer>();
         http.RequestServices = services.BuildServiceProvider();
         provider.EnsureDomainOptions(http, cfg.Domain);
 

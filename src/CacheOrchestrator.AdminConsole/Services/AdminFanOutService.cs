@@ -309,10 +309,10 @@ public sealed class AdminFanOutService
                 return outcome.Value;
         }
 
-        // Fallback: catalog is assembly-local and identical across instances.
+        // An unreachable peer's installed packages and settings cannot be inferred locally.
         return new AdminDomainSettingsCatalogDto
         {
-            Settings = DomainSettingCatalog.GetEntries(),
+            Settings = [],
         };
     }
 

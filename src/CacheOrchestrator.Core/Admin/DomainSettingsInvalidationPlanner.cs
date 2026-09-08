@@ -27,8 +27,7 @@ internal static class DomainSettingsInvalidationPlanner
         "dataCache.ttlSeconds",
         "fusionCache.hardTtlSeconds",
         "fusionCache.failSafeSeconds",
-        "fusionCache.jitterSeconds",
-        "fusionCache.maxItemBytes"
+        "fusionCache.jitterSeconds"
     };
 
     public static DomainSettingsInvalidationTargets Plan(

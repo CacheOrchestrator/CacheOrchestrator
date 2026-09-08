@@ -14,7 +14,6 @@ internal sealed class FusionDomainSettingValueProvider(IFusionDomainSettingsProv
             "fusionCache.hardTtlSeconds" => resolved.HardTtlSeconds,
             "fusionCache.failSafeSeconds" => resolved.FailSafeSeconds,
             "fusionCache.jitterSeconds" => resolved.JitterSeconds,
-            "fusionCache.maxItemBytes" => resolved.MaxItemBytes,
             _ => null
         };
         if (current is null)

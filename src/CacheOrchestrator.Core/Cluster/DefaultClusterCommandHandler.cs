@@ -19,6 +19,7 @@ internal sealed class DefaultClusterCommandHandler : IClusterCommandHandler
     private readonly ClusterCommandDedupeStore _dedupe;
     private readonly IEnumerable<IDomainSettingsPatchContributor> _settingsContributors;
     private readonly ILogger<DefaultClusterCommandHandler> _logger;
+    private readonly DomainSettingCatalog _catalog;
     private readonly DomainSettingsInvalidationCoordinator? _settingsInvalidation;
 
     public DefaultClusterCommandHandler(
@@ -29,7 +30,8 @@ internal sealed class DefaultClusterCommandHandler : IClusterCommandHandler
         ClusterCommandDedupeStore dedupe,
         ILogger<DefaultClusterCommandHandler> logger,
         IEnumerable<IDomainSettingsPatchContributor>? settingsContributors = null,
-        DomainSettingsInvalidationCoordinator? settingsInvalidation = null)
+        DomainSettingsInvalidationCoordinator? settingsInvalidation = null,
+        DomainSettingCatalog? catalog = null)
     {
         ArgumentNullException.ThrowIfNull(invalidator);
         ArgumentNullException.ThrowIfNull(overrides);
@@ -46,181 +48,117 @@ internal sealed class DefaultClusterCommandHandler : IClusterCommandHandler
         _settingsContributors = settingsContributors ?? [];
         _logger = logger;
         _settingsInvalidation = settingsInvalidation;
+        _catalog = catalog ?? DomainSettingCatalog.Core;
     }
 
     /// <inheritdoc />
-    public async Task ApplyLocalAsync(ClusterCommand command, CancellationToken cancellationToken = default)
+    public async Task<ClusterCommandResult> ApplyLocalAsync(ClusterCommand command, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
-
         CacheOrchestratorMetrics.RecordClusterReceived(command.GetType().Name);
-
-        string localNs = _options.CurrentValue.Namespace ?? string.Empty;
-        if (!string.Equals(command.Namespace, localNs, StringComparison.Ordinal))
+        if (!string.Equals(command.Namespace, _options.CurrentValue.Namespace ?? string.Empty, StringComparison.Ordinal))
         {
-            _logger.LogDebug(
-                "Ignoring cluster command {CommandId}: namespace mismatch (command={CommandNs}, local={LocalNs})",
-                command.CommandId,
-                command.Namespace,
-                localNs);
-            return;
+            _logger.LogDebug("Ignoring cluster command {CommandId}: namespace mismatch.", command.CommandId);
+            return new(ClusterCommandStatus.Ignored, "namespace-mismatch");
         }
-
         if (string.Equals(command.OriginInstanceId, _instanceId.InstanceId, StringComparison.Ordinal))
         {
-            _logger.LogDebug(
-                "Ignoring cluster command {CommandId}: origin is self ({InstanceId})",
-                command.CommandId,
-                _instanceId.InstanceId);
-            return;
+            _logger.LogDebug("Ignoring cluster command {CommandId}: origin is self.", command.CommandId);
+            return new(ClusterCommandStatus.Ignored, "origin-is-self");
         }
-
-        if (!_dedupe.TryMarkAsNew(command.CommandId))
-        {
-            _logger.LogDebug(
-                "Ignoring cluster command {CommandId}: duplicate within dedupe window",
-                command.CommandId);
-            return;
-        }
+        if (command.CommandId == Guid.Empty)
+            return new(ClusterCommandStatus.Rejected, "command-id-required");
 
         using (ClusterCommandScope.EnterRemote())
         {
-            switch (command)
-            {
-                case InvalidateCommand inv:
-                    await ApplyInvalidateAsync(inv, cancellationToken).ConfigureAwait(false);
-                    break;
-
-                case VersionBumpCommand bump:
-                    ApplyVersionBump(bump);
-                    break;
-
-                case SettingsPatchCommand settings:
-                    await ApplySettingsPatchAsync(settings, cancellationToken).ConfigureAwait(false);
-                    break;
-
-                default:
-                    _logger.LogWarning(
-                        "Unsupported cluster command type {Type} ({CommandId})",
-                        command.GetType().Name,
-                        command.CommandId);
-                    return;
-            }
+            ClusterCommandResult result = await _dedupe.ExecuteAsync(command.CommandId,
+                (execution, token) => ApplyCommandAsync(command, execution, token), cancellationToken).ConfigureAwait(false);
+            if (result.Status == ClusterCommandStatus.Applied)
+                CacheOrchestratorMetrics.RecordClusterApplied(command.GetType().Name);
+            else if (result.Status == ClusterCommandStatus.AlreadyApplied)
+                _logger.LogDebug("Cluster command {CommandId} was already applied.", command.CommandId);
+            return result;
         }
-
-        CacheOrchestratorMetrics.RecordClusterApplied(command.GetType().Name);
     }
 
-    private async Task ApplyInvalidateAsync(InvalidateCommand command, CancellationToken cancellationToken)
+    private async Task<ClusterCommandResult> ApplyCommandAsync(
+        ClusterCommand command, ClusterCommandExecution execution, CancellationToken cancellationToken)
     {
-        if (command.Kind == CacheInvalidationKind.Domain && !string.IsNullOrWhiteSpace(command.Domain))
-        {
-            await _invalidator.InvalidateDomainAsync(command.Domain, cancellationToken).ConfigureAwait(false);
-            return;
-        }
-
-        if (command.Kind == CacheInvalidationKind.EntityKind
-            && !string.IsNullOrWhiteSpace(command.Domain)
-            && !string.IsNullOrWhiteSpace(command.EntityKind))
-        {
-            await _invalidator.InvalidateEntityKindAsync(command.Domain, command.EntityKind, cancellationToken)
-                .ConfigureAwait(false);
-            return;
-        }
-
-        if (command.Kind == CacheInvalidationKind.Entity
-            && !string.IsNullOrWhiteSpace(command.Domain)
-            && !string.IsNullOrWhiteSpace(command.EntityKind))
-        {
-            if (command.ResourceIds is { Count: > 1 })
-            {
-                await _invalidator.InvalidateEntitiesAsync(
-                        command.Domain,
-                        command.EntityKind,
-                        command.ResourceIds,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-                return;
-            }
-
-            string? id = command.EntityId;
-            if (string.IsNullOrWhiteSpace(id) && command.ResourceIds is { Count: 1 })
-                id = command.ResourceIds[0];
-
-            if (!string.IsNullOrWhiteSpace(id))
-            {
-                await _invalidator.InvalidateEntityAsync(
-                        command.Domain,
-                        command.EntityKind,
-                        id,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-                return;
-            }
-        }
-
-        if (command.Tags is { Length: > 0 })
-        {
-            await _invalidator.InvalidateTagsAsync(command.Tags, cancellationToken).ConfigureAwait(false);
-            return;
-        }
-
-        _logger.LogWarning(
-            "InvalidateCommand {CommandId} had no domain/entity/tags to apply (scope={Scope})",
-            command.CommandId,
-            command.Scope);
-    }
-
-    private void ApplyVersionBump(VersionBumpCommand command)
-    {
-        if (string.IsNullOrWhiteSpace(command.Domain) || string.IsNullOrWhiteSpace(command.Version))
-        {
-            _logger.LogWarning(
-                "VersionBumpCommand {CommandId} missing domain or version",
-                command.CommandId);
-            return;
-        }
-
-        _overrides.SetVersion(command.Domain, command.Version);
-    }
-
-    private async Task ApplySettingsPatchAsync(SettingsPatchCommand command, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(command.Domain))
-        {
-            _logger.LogWarning("SettingsPatchCommand {CommandId} missing domain", command.CommandId);
-            return;
-        }
-
         try
         {
-            string[] settingIds = DomainSettingsInvalidationCoordinator.CanonicalizeSettingIds(command.Settings.Keys);
-            IReadOnlyDictionary<string, System.Text.Json.JsonElement>? before =
-                _settingsInvalidation?.Capture(command.Domain, settingIds);
-            DomainSettingsPatchApplicator.Apply(
-                command.Domain,
-                command.Settings,
-                _overrides,
-                _settingsContributors);
-
-            if (_settingsInvalidation is not null && before is not null)
+            cancellationToken.ThrowIfCancellationRequested();
+            switch (command)
             {
-                await _settingsInvalidation.ApplyAsync(
-                        command.Domain,
-                        settingIds,
-                        before,
-                        command.ApplyImmediately,
-                        cancellationToken)
-                    .ConfigureAwait(false);
+                case InvalidateCommand invalidate:
+                    CacheInvalidationResult invalidation = await ApplyInvalidateAsync(invalidate, cancellationToken).ConfigureAwait(false);
+                    return new(invalidation.Succeeded ? ClusterCommandStatus.Applied : ClusterCommandStatus.Failed,
+                        invalidation.Succeeded ? null : "invalidation-incomplete")
+                    { Invalidation = invalidation };
+                case VersionBumpCommand version:
+                    ArgumentException.ThrowIfNullOrWhiteSpace(version.Domain);
+                    ArgumentException.ThrowIfNullOrWhiteSpace(version.Version);
+                    _overrides.SetVersion(version.Domain, version.Version);
+                    return new(ClusterCommandStatus.Applied, localMutationApplied: true);
+                case SettingsPatchCommand settings:
+                    ArgumentException.ThrowIfNullOrWhiteSpace(settings.Domain);
+                    if (_settingsInvalidation is null)
+                    {
+                        DomainSettingsPatchApplicator.Apply(settings.Domain, settings.Settings, _overrides, _settingsContributors, _catalog);
+                        return new(ClusterCommandStatus.Applied, localMutationApplied: true);
+                    }
+                    DomainSettingsInvalidationPlan plan = _settingsInvalidation.ApplyPatch(
+                        settings.Domain, settings.Settings, _overrides, _settingsContributors, settings.ApplyImmediately);
+                    // Retry only unfinished purges. Never reapply an older patch over a newer mutation.
+                    execution.Resume = token => FinishSettingsAsync(plan, token);
+                    return await execution.Resume(cancellationToken).ConfigureAwait(false);
+                default:
+                    return new(ClusterCommandStatus.Rejected, "unsupported-command");
             }
         }
         catch (ArgumentException ex)
         {
-            _logger.LogWarning(
-                ex,
-                "SettingsPatchCommand {CommandId} rejected: {Message}",
-                command.CommandId,
-                ex.Message);
+            _logger.LogWarning(ex, "Cluster command {CommandId} rejected.", command.CommandId);
+            return new(ClusterCommandStatus.Rejected, ex.Message);
         }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Cluster command {CommandId} failed.", command.CommandId);
+            return new(ClusterCommandStatus.Failed, "execution-failed") { Errors = [ex.Message] };
+        }
+    }
+
+    private async Task<ClusterCommandResult> FinishSettingsAsync(DomainSettingsInvalidationPlan plan, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<string> errors = await _settingsInvalidation!.ApplyAsync(plan, cancellationToken).ConfigureAwait(false);
+        return new(errors.Count == 0 ? ClusterCommandStatus.Applied : ClusterCommandStatus.Failed,
+            errors.Count == 0 ? null : "settings-invalidation-incomplete", localMutationApplied: true)
+        { Errors = errors };
+    }
+
+    private async Task<CacheInvalidationResult> ApplyInvalidateAsync(InvalidateCommand command, CancellationToken cancellationToken)
+    {
+        if (!Enum.IsDefined(command.Kind))
+            throw new ArgumentException("Invalidation kind is not defined.", nameof(command));
+        if (command.Kind == CacheInvalidationKind.Domain && !string.IsNullOrWhiteSpace(command.Domain))
+            return await _invalidator.InvalidateDomainAsync(command.Domain, cancellationToken).ConfigureAwait(false);
+        if (command.Kind == CacheInvalidationKind.EntityKind
+            && !string.IsNullOrWhiteSpace(command.Domain) && !string.IsNullOrWhiteSpace(command.EntityKind))
+        {
+            return await _invalidator.InvalidateEntityKindAsync(command.Domain, command.EntityKind, cancellationToken).ConfigureAwait(false);
+        }
+        if (command.Kind == CacheInvalidationKind.Entity
+            && !string.IsNullOrWhiteSpace(command.Domain) && !string.IsNullOrWhiteSpace(command.EntityKind))
+        {
+            if (command.ResourceIds is { Count: > 1 })
+                return await _invalidator.InvalidateEntitiesAsync(command.Domain, command.EntityKind, command.ResourceIds, cancellationToken).ConfigureAwait(false);
+            string? id = command.EntityId;
+            if (string.IsNullOrWhiteSpace(id) && command.ResourceIds is { Count: 1 })
+                id = command.ResourceIds[0];
+            if (!string.IsNullOrWhiteSpace(id))
+                return await _invalidator.InvalidateEntityAsync(command.Domain, command.EntityKind, id, cancellationToken).ConfigureAwait(false);
+        }
+        if (command.Tags is { Length: > 0 })
+            return await _invalidator.InvalidateTagsAsync(command.Tags, cancellationToken).ConfigureAwait(false);
+        throw new ArgumentException("Invalidation command has no valid domain, entity, or tags.", nameof(command));
     }
 }

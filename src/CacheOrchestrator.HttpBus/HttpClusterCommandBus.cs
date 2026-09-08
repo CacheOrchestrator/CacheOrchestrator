@@ -155,6 +155,10 @@ internal sealed class HttpClusterCommandBus : IClusterCommandBus
                 timeoutMs);
             return new ClusterPeerPublishOutcome { PeerId = peer.Id, Succeeded = false, Error = error };
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             CacheOrchestratorMetrics.RecordClusterPublishFailure("transport");

@@ -33,9 +33,6 @@ internal static class FusionEntryOptionsFactory
         double eagerRefresh = overlay?.EagerRefreshRatio
             ?? fusion?.EagerRefreshRatio
             ?? 0.9;
-        int maxItemBytes = overlay?.MaxItemBytes
-            ?? fusion?.MaxItemBytes
-            ?? 0;
         bool allowBackgroundDistributed = overlay?.AllowBackgroundDistributed
             ?? fusion?.AllowBackgroundDistributed
             ?? true;
@@ -63,9 +60,6 @@ internal static class FusionEntryOptionsFactory
 
         if (eagerRefresh is > 0 and < 1)
             o.EagerRefreshThreshold = (float)eagerRefresh;
-
-        if (maxItemBytes > 0)
-            o.Size = maxItemBytes;
 
         TimeSpan soft = factorySoftTimeout < TimeSpan.Zero ? TimeSpan.Zero : factorySoftTimeout;
         TimeSpan hard = factoryHardTimeout < TimeSpan.Zero ? TimeSpan.Zero : factoryHardTimeout;

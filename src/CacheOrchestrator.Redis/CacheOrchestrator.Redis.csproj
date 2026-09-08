@@ -3,7 +3,6 @@
 		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<LangVersion>latest</LangVersion>
 		<PackageId>CacheOrchestrator.Redis</PackageId>
 		<!-- Meta: AspNetCore.Redis + FusionCache.Redis -->
 		<Description>Meta package for CacheOrchestrator Redis backends: Output Cache store and FusionCache L2 / backplane. Prefer this for typical web apps. For Output Cache only use CacheOrchestrator.AspNetCore.Redis; for Fusion L2 only use CacheOrchestrator.FusionCache.Redis.</Description>

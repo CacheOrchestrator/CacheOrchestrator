@@ -1,4 +1,5 @@
 using CacheOrchestrator.Admin;
+using CacheOrchestrator.Configuration;
 using System.Globalization;
 using System.Text.Json;
 
@@ -7,17 +8,12 @@ namespace CacheOrchestrator.FusionCache;
 /// <summary>Maps <c>fusionCache.*</c> Admin overlay keys onto <see cref="IFusionDomainRuntimeOverrideStore"/>.</summary>
 internal static class FusionSettingsPatchMapper
 {
-    /// <summary>Applies owned Fusion overlay keys for <paramref name="domain"/>.</summary>
-    public static void Apply(
-        string domain,
-        IReadOnlyDictionary<string, JsonElement> settings,
-        IFusionDomainRuntimeOverrideStore store)
+    /// <summary>Parses and validates owned Fusion overlay keys.</summary>
+    public static FusionDomainSettingsPatch Parse(IReadOnlyDictionary<string, JsonElement> settings)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(domain);
         ArgumentNullException.ThrowIfNull(settings);
-        ArgumentNullException.ThrowIfNull(store);
         if (settings.Count == 0)
-            return;
+            throw new ArgumentException("At least one Fusion setting must be set.", nameof(settings));
 
         TimeSpan? hardTtl = null;
         TimeSpan? failSafe = null;
@@ -25,7 +21,6 @@ internal static class FusionSettingsPatchMapper
         TimeSpan? jitter = null;
         TimeSpan? factorySoftTimeout = null;
         TimeSpan? factoryHardTimeout = null;
-        int? maxItemBytes = null;
         bool? allowBackgroundDistributed = null;
         bool? allowBackgroundBackplane = null;
 
@@ -46,7 +41,7 @@ internal static class FusionSettingsPatchMapper
                     break;
                 case "eagerRefreshRatio":
                     eagerRefreshRatio = ReadDouble(el, id);
-                    if (eagerRefreshRatio is < 0 or >= 1)
+                    if (!double.IsFinite(eagerRefreshRatio.Value) || eagerRefreshRatio is < 0 or >= 1)
                         throw new ArgumentException($"Setting '{id}' must be in [0, 1).", id);
                     break;
                 case "jitterSeconds":
@@ -57,9 +52,6 @@ internal static class FusionSettingsPatchMapper
                     break;
                 case "factoryHardTimeoutSeconds":
                     factoryHardTimeout = ReadNonNegSecondsAsTimeSpan(el, id);
-                    break;
-                case "maxItemBytes":
-                    maxItemBytes = ReadNonNegInt(el, id);
                     break;
                 case "allowBackgroundDistributed":
                     allowBackgroundDistributed = ReadBool(el, id);
@@ -80,7 +72,6 @@ internal static class FusionSettingsPatchMapper
             Jitter = jitter,
             FactorySoftTimeout = factorySoftTimeout,
             FactoryHardTimeout = factoryHardTimeout,
-            MaxItemBytes = maxItemBytes,
             AllowBackgroundDistributed = allowBackgroundDistributed,
             AllowBackgroundBackplane = allowBackgroundBackplane,
         };
@@ -88,7 +79,7 @@ internal static class FusionSettingsPatchMapper
         if (!patch.HasAny)
             throw new ArgumentException("At least one Fusion setting must be set.", nameof(settings));
 
-        store.PatchSettings(domain, patch);
+        return patch;
     }
 
     private static bool ReadBool(JsonElement el, string id) =>
@@ -131,19 +122,41 @@ internal static class FusionSettingsPatchMapper
 /// <summary>Routes <c>fusionCache.*</c> Admin/cluster settings patches to the Fusion overlay store.</summary>
 internal sealed class FusionDomainSettingsPatchContributor : IDomainSettingsPatchContributor
 {
-    private readonly IFusionDomainRuntimeOverrideStore _store;
+    private readonly IFusionDomainSettingsProvider _settings;
 
-    public FusionDomainSettingsPatchContributor(IFusionDomainRuntimeOverrideStore store)
+    private readonly IDomainCacheOptionsProvider _core;
+    public FusionDomainSettingsPatchContributor(IFusionDomainSettingsProvider settings, IDomainCacheOptionsProvider core)
     {
-        ArgumentNullException.ThrowIfNull(store);
-        _store = store;
+        _settings = settings;
+        _core = core;
     }
 
-    /// <inheritdoc />
-    public bool Owns(string settingId) =>
-        settingId.StartsWith("fusionCache.", StringComparison.OrdinalIgnoreCase);
+    public bool Owns(string settingId) => settingId.StartsWith("fusionCache.", StringComparison.OrdinalIgnoreCase);
 
-    /// <inheritdoc />
-    public void Apply(string domain, IReadOnlyDictionary<string, JsonElement> settings) =>
-        FusionSettingsPatchMapper.Apply(domain, settings, _store);
+    public void Prepare(DomainSettingsPatchContext context, IReadOnlyDictionary<string, JsonElement> settings)
+    {
+        FusionDomainSettingsPatch patch = FusionSettingsPatchMapper.Parse(settings);
+        FusionDomainRuntimeOverride merged = FusionDomainRuntimeOverrideStore.Merge(
+            context.Get<FusionDomainRuntimeOverride>() ?? new(), patch, context.Stamp);
+        context.Set(merged);
+    }
+
+    public void Validate(DomainSettingsPatchContext context)
+    {
+        FusionDomainRuntimeOverride merged = context.Get<FusionDomainRuntimeOverride>() ?? new();
+        DomainFusionCacheSettings effective = _settings.Get(context.Domain);
+        var candidate = new DomainFusionCacheSettings
+        {
+            HardTtlSeconds = (int?)merged.HardTtl?.TotalSeconds ?? effective.HardTtlSeconds,
+            FailSafeSeconds = (int?)merged.FailSafe?.TotalSeconds ?? effective.FailSafeSeconds,
+            FactorySoftTimeoutSeconds = (int?)merged.FactorySoftTimeout?.TotalSeconds ?? effective.FactorySoftTimeoutSeconds,
+            FactoryHardTimeoutSeconds = (int?)merged.FactoryHardTimeout?.TotalSeconds ?? effective.FactoryHardTimeoutSeconds
+        };
+        TimeSpan dataTtl = context.Get<DomainRuntimeOverride>()?.DataCacheTtl
+            ?? _core.GetOrCreateDomainOptions(context.Domain).DataCacheTtl;
+        List<string> failures = [];
+        FusionCacheConfigurationValidator.ValidateEffective(context.Domain, candidate, (int)dataTtl.TotalSeconds, failures);
+        if (failures.Count != 0)
+            throw new ArgumentException(string.Join(" ", failures));
+    }
 }

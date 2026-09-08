@@ -1,10 +1,12 @@
 using CacheOrchestrator.Configuration;
 using CacheOrchestrator.DataCache;
 using CacheOrchestrator.DependencyInjection;
+using CacheOrchestrator.Diagnostics;
 using CacheOrchestrator.IntegrationTests.Infrastructure;
 using CacheOrchestrator.Invalidation;
 using CacheOrchestrator.Redis;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -87,6 +89,49 @@ public sealed class FusionCacheMultiInstanceRedisTests : IAsyncLifetime
 
         IFusionCacheProvider fusionProvider = sp.GetRequiredService<IFusionCacheProvider>();
         fusionProvider.GetCache("default").Should().NotBeSameAs(fusionProvider.GetCache("pii"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DataInstanceNamedOc_IsIsolatedFromOutputCache_InEitherRegistrationOrder(bool fusionFirst)
+    {
+        string suffix = Guid.NewGuid().ToString("N");
+        IConfiguration config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Cache:Namespace"] = "collision-" + suffix,
+            ["Cache:OutputCache:Provider"] = "Redis",
+            ["Cache:OutputCache:Redis:Configuration"] = _redisA.GetConnectionString(),
+            ["Cache:DataCacheInstances:oc:Provider"] = "Redis",
+            ["Cache:DataCacheInstances:oc:Redis:Configuration"] = _redisB.GetConnectionString(),
+            ["Cache:DomainDefaults:DataCache:Instance"] = "oc"
+        }).Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddRedisFusionCacheBackend(config);
+        if (fusionFirst)
+            services.AddCacheOrchestratorFusionCache(config);
+        services.AddCacheOrchestratorAspNetCore(config, builder => builder.AddRedisOutputCacheBackend());
+        if (!fusionFirst)
+            services.AddCacheOrchestratorFusionCache(config);
+        await using ServiceProvider provider = services.BuildServiceProvider();
+        ICacheOrchestratorHealthProbe[] probes = provider.GetServices<ICacheOrchestratorHealthProbe>().ToArray();
+        probes.Select(probe => probe.Name).Should().BeEquivalentTo(new[] { "redis:output-cache", "redis:data-cache:oc" });
+        foreach (ICacheOrchestratorHealthProbe probe in probes)
+            await probe.ProbeAsync(TestContext.Current.CancellationToken);
+
+        string key = "data-collision-" + suffix;
+        await provider.GetRequiredKeyedService<IDistributedCache>("oc").SetAsync(key, new byte[] { 1, 2, 3 }, TestContext.Current.CancellationToken);
+        await using IConnectionMultiplexer outputRedis = await ConnectionMultiplexer.ConnectAsync(_redisA.GetConnectionString());
+        await using IConnectionMultiplexer dataRedis = await ConnectionMultiplexer.ConnectAsync(_redisB.GetConnectionString());
+        (await dataRedis.GetDatabase().KeyExistsAsync(key)).Should().BeTrue();
+        (await outputRedis.GetDatabase().KeyExistsAsync(key)).Should().BeFalse();
+
+        IOutputCacheStore output = provider.GetRequiredService<IOutputCacheStore>();
+        await output.SetAsync("output-" + suffix, new byte[] { 4, 5 }, [], TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken);
+        (await output.GetAsync("output-" + suffix, TestContext.Current.CancellationToken)).Should().Equal(4, 5);
+        outputRedis.GetServer(outputRedis.GetEndPoints()[0]).Keys(pattern: "*output-" + suffix + "*").Should().NotBeEmpty();
+        dataRedis.GetServer(dataRedis.GetEndPoints()[0]).Keys(pattern: "*output-" + suffix + "*").Should().BeEmpty();
     }
 
     [Fact]

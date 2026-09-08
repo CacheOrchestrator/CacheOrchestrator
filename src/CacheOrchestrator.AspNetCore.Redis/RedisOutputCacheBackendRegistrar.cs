@@ -11,6 +11,8 @@ namespace CacheOrchestrator.Redis;
 /// </summary>
 internal sealed class RedisOutputCacheBackendRegistrar : IOutputCacheBackendRegistrar
 {
+    private static readonly object ConnectionKey = new();
+
     /// <inheritdoc />
     public string Name => RedisConfiguration.ProviderName;
 
@@ -34,14 +36,14 @@ internal sealed class RedisOutputCacheBackendRegistrar : IOutputCacheBackendRegi
 
         context.Services.AddSingleton<ICacheOrchestratorHealthProbe>(sp =>
         {
-            IConnectionMultiplexer mux = sp.GetRequiredKeyedService<IConnectionMultiplexer>("oc");
-            return new RedisCacheHealthProbe("redis:oc", mux);
+            IConnectionMultiplexer mux = sp.GetRequiredKeyedService<IConnectionMultiplexer>(ConnectionKey);
+            return new RedisCacheHealthProbe("redis:output-cache", mux);
         });
 
         context.RegisterStore(() =>
         {
             context.Services.TryAddKeyedSingleton<IConnectionMultiplexer>(
-                "oc",
+                ConnectionKey,
                 (_, _) => ConnectionMultiplexer.Connect(configOptions));
 
             context.Services.AddStackExchangeRedisOutputCache(o =>

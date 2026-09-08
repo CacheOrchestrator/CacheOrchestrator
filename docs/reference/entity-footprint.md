@@ -11,15 +11,15 @@ Declare primary identity on the endpoint (`resourceRouteKey` + `entityKind`, or 
 - [Model (short)](#model-short)
 - [Detail (primary only)](#detail-primary-only)
 - [Negative cache](#negative-cache)
-- [References / expanded graph](#references-expanded-graph)
-- [Aggregate (root + children)](#aggregate-root-children)
-- [List / search / page](#list-search-page)
+- [References / expanded graph](#references--expanded-graph)
+- [Aggregate (root + children)](#aggregate-root--children)
+- [List / search / page](#list--search--page)
 - [Filtered view](#filtered-view)
 - [Nested resource](#nested-resource)
 - [Batch `?ids=`](#batch-ids)
-- [Derived / computed](#derived-computed)
+- [Derived / computed](#derived--computed)
 - [Alternate key (alias)](#alternate-key-alias)
-- [Dashboard / composite widget](#dashboard-composite-widget)
+- [Dashboard / composite widget](#dashboard--composite-widget)
 - [Fusion-only (no Output Cache entity metadata)](#fusion-only-no-output-cache-entity-metadata)
 - [Snapshot list without member tags](#snapshot-list-without-member-tags)
 
@@ -34,6 +34,8 @@ Declare primary identity on the endpoint (`resourceRouteKey` + `entityKind`, or 
 | Tags | `domain:…`, `entity:…`, `entitykind:…` — shared by Output Cache (early and late) and Fusion |
 
 Invalidation stays `InvalidateEntityAsync` / `InvalidateEntityKindAsync` / `InvalidateEntitiesAsync`.
+
+Every materialization includes its complete footprint, including Fusion eager refresh and background completion after a soft timeout. The HTTP adapter captures primary identity before the factory starts. Application factories that may outlive a request must likewise capture request values beforehand and obtain their own service scope for work that needs scoped services; do not retain `HttpContext` or a request-owned `DbContext` in such factories.
 
 **`EntityCache.Miss<T>()`** means: “for **this request’s primary id** (from `resourceRouteKey` / `SetEntityIdentity`), cache that there is **no value**.” The type argument `T` is only the CLR type of the payload (e.g. `Product` or `ProductDetailsDto`). It is **not** a miss of every product / every DTO — other ids keep their own entries. Returning `null` from `Func<CancellationToken, Task<T?>>` does the same for primary-only footprints.
 

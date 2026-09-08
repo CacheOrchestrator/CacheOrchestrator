@@ -114,38 +114,20 @@ internal sealed class CacheOrchestratorService : ICacheOrchestrator
 
         try
         {
-            DataCacheProviderResult<FootprintCacheBox<T?>> result = await _dataCache.GetOrCreateAsync(
+            DataCacheProviderResult<FootprintCacheBox<T?>> result = await _dataCache.GetOrCreateWithTagsAsync(
                     earlyRequest,
                     async token =>
                     {
                         FootprintCacheBox<T?> produced = await factory(token).ConfigureAwait(false);
                         return NormalizeBox(produced);
                     },
+                    box => BuildTags(opts, box.Footprint, request.AdditionalTags),
                     cancellationToken)
                 .ConfigureAwait(false);
             EnsureKnownOutcome(result.Outcome);
             request.OutcomeObserver?.Invoke(result.Outcome);
 
             FootprintCacheBox<T?> box = NormalizeBox(result.Value);
-
-            // Refresh tags after miss when the factory expanded the footprint beyond early tags.
-            if (result.Outcome == DataCacheProviderOutcome.Materialized)
-            {
-                IReadOnlyList<string> finalTags = BuildTags(opts, box.Footprint, request.AdditionalTags);
-                // Performance: avoid a second backend write when the factory did not expand the early footprint.
-                if (!TagsEqual(earlyRequest.Tags, finalTags))
-                {
-                    DataCacheProviderRequest finalRequest = new()
-                    {
-                        Key = earlyRequest.Key,
-                        InstanceName = earlyRequest.InstanceName,
-                        Tags = finalTags,
-                        DomainOptions = opts
-                    };
-
-                    await _dataCache.SetAsync(finalRequest, box, cancellationToken).ConfigureAwait(false);
-                }
-            }
 
             activity?.SetTag("cache.result", OutcomeTag(result.Outcome));
             return box;
@@ -260,20 +242,6 @@ internal sealed class CacheOrchestratorService : ICacheOrchestrator
             IsMiss = box.IsMiss,
             Footprint = box.Footprint ?? EntityFootprint.Empty
         };
-    }
-
-    private static bool TagsEqual(IReadOnlyList<string> left, IReadOnlyList<string> right)
-    {
-        if (left.Count != right.Count)
-            return false;
-
-        for (int i = 0; i < left.Count; i++)
-        {
-            if (!string.Equals(left[i], right[i], StringComparison.Ordinal))
-                return false;
-        }
-
-        return true;
     }
 
     private static void EnsureKnownOutcome(DataCacheProviderOutcome outcome)

@@ -26,6 +26,8 @@ Start with the [root README](../README.md) for the product overview and quick st
 
 ## How-to
 
+- [Upgrade to 3.0](guide/upgrading-to-3.md) — application and implementer changes, cache isolation, rollout and rollback
+
 - [Package composition](how-to/composition.md) — scenarios 1–8 (typical web, Hybrid, Redis, library, EF, …)
 
 ## Reference

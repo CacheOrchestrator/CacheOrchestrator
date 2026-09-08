@@ -30,11 +30,15 @@ All classes use a shared short job (`[ShortJob]`: net10.0, warmup 1 / iteration 
 
 For a release decision, run the affected filter with a longer BenchmarkDotNet job on an otherwise idle machine and compare the same commit range and runtime. CI deliberately runs deterministic allocation tripwires from the unit-test suites; wall-clock benchmark results are machine-specific and remain a maintainer release check.
 
+The release checks also include `HttpOutputCacheBenchmarks` (actual TestServer HTTP hit/miss with a factory-count assertion), `DomainDataCacheHitBenchmarks.EntityFootprint_InvalidateAndRefresh` (purge plus complete rematerialization), and `InvalidationFanOutBenchmarks` (native Fusion invalidation across one/eight named instances). HTTP timings include the test transport; the refresh case includes invalidation and cannot be interpreted as factory-only overhead. The policy-only fixtures reuse prepared request contexts and exclude HTTP transport/setup.
+
+Check every selected case produced a result: BenchmarkDotNet can report a failed case as `NA` even when the process exits successfully. Keep failed logs and do not include those rows in a performance claim. Allocation changes on ordinary hits and deliberate extra marker lookups on Hybrid footprint hits should be reported separately.
+
 ## Hot paths covered by benchmarks
 
 | Benchmark | What it measures |
 |-----------|------------------|
-| `DomainKeyGeneratorBenchmarks` | Fusion key materialization (path, query, tracking, encoding, host, **resource id**, **route endpoint**) |
+| `DomainKeyGeneratorBenchmarks` | Data Cache key materialization (path, query, tracking, encoding, host, **resource id**, **route endpoint**) |
 | `HttpHelperBenchmarks` | Tracking query detection, `Cache-Control: no-store` scan, Accept-Encoding normalization |
 | `ClientCacheHeaderGeneratorBenchmarks` | Client Cache Schedule `Cache-Control` (Calm / Approaching / **Hold** / **must-revalidate** / NoStore / Private) |
 | `CacheOrchestratorHeaderFormatterBenchmarks` | Diagnostic `X-CacheOrchestrator` formatting (Hit / Miss / **Stale** / **Bypass** / **Blocked** / Hold phase) |

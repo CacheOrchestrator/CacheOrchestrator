@@ -6,12 +6,12 @@
 		<Nullable>enable</Nullable>
 		<IsPackable>false</IsPackable>
 		<IsTestProject>true</IsTestProject>
-		<LangVersion>latest</LangVersion>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<None Update="Edge\Varnish\default.vcl" CopyToOutputDirectory="PreserveNewest" />
 		<None Update="Edge\Varnish\nginx.conf" CopyToOutputDirectory="PreserveNewest" />
+		<None Include="..\..\docs\guide\domain-profiles.md" Link="Documentation\domain-profiles.md" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -20,6 +20,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+		<PackageReference Include="coverlet.collector" Version="6.0.4" PrivateAssets="all" />
 		<PackageReference Include="NSubstitute" Version="6.0.0" />
 		<PackageReference Include="xunit.v3" Version="3.0.0" />
 		<PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />

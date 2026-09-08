@@ -24,7 +24,7 @@ internal sealed class FusionCacheConfigurationValidator : IValidateOptions<Cache
             return ValidateOptionsResult.Success;
 
         List<string> failures = [];
-        DomainFusionCacheSettings defaults = Bind("DomainDefaults");
+        DomainFusionCacheSettings defaults = Bind("DomainDefaults", failures);
         ValidateRaw("DomainDefaults", defaults, failures);
         ValidateEffective(
             "DomainDefaults",
@@ -34,7 +34,7 @@ internal sealed class FusionCacheConfigurationValidator : IValidateOptions<Cache
 
         foreach ((string domain, CacheOrchestratorOptions.DomainCacheSettings coreSettings) in options.Domains)
         {
-            DomainFusionCacheSettings specific = Bind($"Domains:{domain}");
+            DomainFusionCacheSettings specific = Bind($"Domains:{domain}", failures);
             ValidateRaw($"Domain '{domain}'", specific, failures);
             ValidateEffective(
                 $"Domain '{domain}'",
@@ -50,10 +50,13 @@ internal sealed class FusionCacheConfigurationValidator : IValidateOptions<Cache
             : ValidateOptionsResult.Fail(failures);
     }
 
-    private DomainFusionCacheSettings Bind(string path)
+    private DomainFusionCacheSettings Bind(string path, List<string> failures)
     {
         DomainFusionCacheSettings settings = new();
-        _configuration!.GetSection($"{_configSection}:{path}:FusionCache").Bind(settings);
+        IConfigurationSection section = _configuration!.GetSection($"{_configSection}:{path}:FusionCache");
+        if (section.GetSection("MaxItemBytes").Exists())
+            failures.Add($"{section.Path}:MaxItemBytes was removed in 3.0. Remove the key; it never enforced a byte limit. Configure memory budgets in the underlying cache engine.");
+        section.Bind(settings);
         return settings;
     }
 
@@ -68,7 +71,6 @@ internal sealed class FusionCacheConfigurationValidator : IValidateOptions<Cache
             JitterSeconds = specific.JitterSeconds ?? defaults.JitterSeconds,
             FactorySoftTimeoutSeconds = specific.FactorySoftTimeoutSeconds ?? defaults.FactorySoftTimeoutSeconds,
             FactoryHardTimeoutSeconds = specific.FactoryHardTimeoutSeconds ?? defaults.FactoryHardTimeoutSeconds,
-            MaxItemBytes = specific.MaxItemBytes ?? defaults.MaxItemBytes,
             AllowBackgroundDistributed = specific.AllowBackgroundDistributed ?? defaults.AllowBackgroundDistributed,
             AllowBackgroundBackplane = specific.AllowBackgroundBackplane ?? defaults.AllowBackgroundBackplane,
         };
@@ -83,7 +85,6 @@ internal sealed class FusionCacheConfigurationValidator : IValidateOptions<Cache
         NonNegative(label, nameof(settings.JitterSeconds), settings.JitterSeconds, failures);
         NonNegative(label, nameof(settings.FactorySoftTimeoutSeconds), settings.FactorySoftTimeoutSeconds, failures);
         NonNegative(label, nameof(settings.FactoryHardTimeoutSeconds), settings.FactoryHardTimeoutSeconds, failures);
-        NonNegative(label, nameof(settings.MaxItemBytes), settings.MaxItemBytes, failures);
 
         if (settings.EagerRefreshRatio is double eager
             && (!double.IsFinite(eager) || eager < 0 || eager >= 1))
@@ -92,7 +93,7 @@ internal sealed class FusionCacheConfigurationValidator : IValidateOptions<Cache
         }
     }
 
-    private static void ValidateEffective(
+    internal static void ValidateEffective(
         string label,
         DomainFusionCacheSettings settings,
         int dataCacheTtlSeconds,

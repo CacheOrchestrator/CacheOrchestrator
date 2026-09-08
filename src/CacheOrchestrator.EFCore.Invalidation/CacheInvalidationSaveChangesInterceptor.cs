@@ -1,4 +1,3 @@
-using CacheOrchestrator.Invalidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -10,7 +9,7 @@ namespace CacheOrchestrator.EFCore;
 
 /// <summary>
 /// Snapshots mapped <c>Added</c>/<c>Modified</c>/<c>Deleted</c> entries in <c>SavingChanges</c>
-/// and invalidates them after a successful save. Failures are logged and do not fail the save.
+/// and materializes ids after a successful save. Invalidation waits for the owning transaction's commit.
 /// </summary>
 /// <remarks>
 /// Register as a singleton and attach per <c>DbContext</c> with
@@ -21,7 +20,7 @@ internal sealed class CacheInvalidationSaveChangesInterceptor : SaveChangesInter
 {
     private static readonly ConditionalWeakTable<DbContext, List<PendingChange>> Pending = [];
 
-    private readonly ICacheOrchestratorInvalidator _invalidator;
+    private readonly CacheInvalidationTransactionInterceptor _transactions;
     private readonly IEntityCacheMappingResolver _resolver;
     private readonly IOptionsMonitor<EfCoreInvalidationOptions> _options;
     private readonly ILogger<CacheInvalidationSaveChangesInterceptor> _logger;
@@ -30,16 +29,16 @@ internal sealed class CacheInvalidationSaveChangesInterceptor : SaveChangesInter
     /// Initializes a new instance of the <see cref="CacheInvalidationSaveChangesInterceptor"/> class.
     /// </summary>
     internal CacheInvalidationSaveChangesInterceptor(
-        ICacheOrchestratorInvalidator invalidator,
+        CacheInvalidationTransactionInterceptor transactions,
         IEntityCacheMappingResolver resolver,
         IOptionsMonitor<EfCoreInvalidationOptions> options,
         ILogger<CacheInvalidationSaveChangesInterceptor> logger)
     {
-        ArgumentNullException.ThrowIfNull(invalidator);
+        ArgumentNullException.ThrowIfNull(transactions);
         ArgumentNullException.ThrowIfNull(resolver);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(logger);
-        _invalidator = invalidator;
+        _transactions = transactions;
         _resolver = resolver;
         _options = options;
         _logger = logger;
@@ -65,7 +64,7 @@ internal sealed class CacheInvalidationSaveChangesInterceptor : SaveChangesInter
     /// <inheritdoc />
     public override int SavedChanges(SaveChangesCompletedEventData eventData, int result)
     {
-        InvalidateAsync(eventData.Context, CancellationToken.None).AsTask().GetAwaiter().GetResult();
+        ProcessSavedChangesAsync(eventData.Context).AsTask().GetAwaiter().GetResult();
         return base.SavedChanges(eventData, result);
     }
 
@@ -75,9 +74,9 @@ internal sealed class CacheInvalidationSaveChangesInterceptor : SaveChangesInter
         int result,
         CancellationToken cancellationToken = default)
     {
-        // The database write has already completed. Caller cancellation must not turn a committed
-        // save into a canceled result or skip post-commit invalidation.
-        await InvalidateAsync(eventData.Context, CancellationToken.None).ConfigureAwait(false);
+        // Capture successful writes despite caller cancellation. The owning transaction controls
+        // when these ids become eligible for invalidation.
+        await ProcessSavedChangesAsync(eventData.Context).ConfigureAwait(false);
         return await base.SavedChangesAsync(eventData, result, CancellationToken.None).ConfigureAwait(false);
     }
 
@@ -95,6 +94,16 @@ internal sealed class CacheInvalidationSaveChangesInterceptor : SaveChangesInter
     {
         Discard(eventData.Context);
         return base.SaveChangesFailedAsync(eventData, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public override void SaveChangesCanceled(DbContextEventData eventData) => Discard(eventData.Context);
+
+    /// <inheritdoc />
+    public override Task SaveChangesCanceledAsync(DbContextEventData eventData, CancellationToken cancellationToken = default)
+    {
+        Discard(eventData.Context);
+        return Task.CompletedTask;
     }
 
     private void Capture(DbContext? context)
@@ -131,7 +140,7 @@ internal sealed class CacheInvalidationSaveChangesInterceptor : SaveChangesInter
             Pending.Add(context, pending);
     }
 
-    private async ValueTask InvalidateAsync(DbContext? context, CancellationToken cancellationToken)
+    private async ValueTask ProcessSavedChangesAsync(DbContext? context)
     {
         if (context is null)
             return;
@@ -184,55 +193,9 @@ internal sealed class CacheInvalidationSaveChangesInterceptor : SaveChangesInter
             }
         }
 
-        foreach (KeyValuePair<(string Domain, string EntityKind), PendingInvalidationGroup> group in groups)
-        {
-            try
-            {
-                await InvalidateGroupAsync(
-                        opts,
-                        group.Key.Domain,
-                        group.Key.EntityKind,
-                        group.Value.Ids,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(
-                    ex,
-                    "Cache invalidation failed after SaveChanges for domain '{Domain}' entityKind '{EntityKind}'.",
-                    group.Key.Domain,
-                    group.Key.EntityKind);
-            }
-        }
-    }
-
-    private async ValueTask InvalidateGroupAsync(
-        EfCoreInvalidationOptions opts,
-        string domain,
-        string entityKind,
-        List<string> ids,
-        CancellationToken cancellationToken)
-    {
-        bool bulk = opts.OnBulk != EfCoreOnBulk.Entities
-            && opts.BulkThreshold > 0
-            && ids.Count >= opts.BulkThreshold;
-
-        if (bulk && opts.OnBulk == EfCoreOnBulk.Domain)
-        {
-            await _invalidator.InvalidateDomainAsync(domain, cancellationToken).ConfigureAwait(false);
-            return;
-        }
-
-        if (bulk && opts.OnBulk == EfCoreOnBulk.Kind)
-        {
-            await _invalidator.InvalidateEntityKindAsync(domain, entityKind, cancellationToken)
-                .ConfigureAwait(false);
-            return;
-        }
-
-        await _invalidator.InvalidateEntitiesAsync(domain, entityKind, ids, cancellationToken)
-            .ConfigureAwait(false);
+        EfInvalidationWork[] work = groups.Select(group => new EfInvalidationWork(
+            group.Key.Domain, group.Key.EntityKind, group.Value.Ids, opts.OnBulk, opts.BulkThreshold)).ToArray();
+        await _transactions.PublishAsync(context, work).ConfigureAwait(false);
     }
 
     private static void Discard(DbContext? context)

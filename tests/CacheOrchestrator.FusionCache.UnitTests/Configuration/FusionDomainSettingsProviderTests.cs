@@ -42,6 +42,48 @@ public sealed class FusionDomainSettingsProviderTests
         updated.JitterSeconds.Should().Be(17);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Reload_DoesNotPublishAnOldInFlightBinding(bool publishNewFirst)
+    {
+        IConfigurationRoot configuration = BuildConfiguration();
+        IFusionDomainRuntimeOverrideStore overrides = Substitute.For<IFusionDomainRuntimeOverrideStore>();
+        TaskCompletionSource entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        using ManualResetEventSlim release = new();
+        int reads = 0;
+        overrides.Get("catalog").Returns(_ =>
+        {
+            if (Interlocked.Increment(ref reads) == 1)
+            {
+                entered.TrySetResult();
+                release.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken).Should().BeTrue();
+            }
+            return null;
+        });
+        using FusionDomainSettingsProvider provider = CreateProvider(configuration, overrides);
+        Task<DomainFusionCacheSettings> slow = Task.Run(() => provider.Get("catalog"), TestContext.Current.CancellationToken);
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            configuration["Cache:Domains:catalog:FusionCache:JitterSeconds"] = "17";
+            configuration.Reload();
+            DomainFusionCacheSettings? before = publishNewFirst ? provider.Get("catalog") : null;
+            release.Set();
+            (await slow).JitterSeconds.Should().Be(3);
+            DomainFusionCacheSettings fresh = provider.Get("catalog");
+            fresh.JitterSeconds.Should().Be(17);
+            if (before is not null)
+                fresh.Should().BeSameAs(before);
+            provider.Get("catalog").Should().BeSameAs(fresh);
+        }
+        finally
+        {
+            release.Set();
+            await slow;
+        }
+    }
+
     private static IConfigurationRoot BuildConfiguration() =>
         new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>

@@ -15,7 +15,7 @@ internal sealed class FusionDomainSettingsProvider : IFusionDomainSettingsProvid
     private readonly IConfiguration _configuration;
     private readonly IFusionDomainRuntimeOverrideStore _runtimeOverrides;
     private readonly string _configSection;
-    private readonly ConcurrentDictionary<string, CachedSettings> _cache = new(StringComparer.Ordinal);
+    private ConcurrentDictionary<string, CachedSettings> _cache = new(StringComparer.Ordinal);
     private readonly IDisposable _reloadRegistration;
 
     public FusionDomainSettingsProvider(
@@ -32,7 +32,7 @@ internal sealed class FusionDomainSettingsProvider : IFusionDomainSettingsProvid
         _configSection = string.IsNullOrWhiteSpace(configSection) ? "Cache" : configSection;
         _reloadRegistration = ChangeToken.OnChange(
             _configuration.GetReloadToken,
-            _cache.Clear);
+            () => Interlocked.Exchange(ref _cache, new(StringComparer.Ordinal)));
     }
 
     private sealed class CachedSettings
@@ -48,14 +48,15 @@ internal sealed class FusionDomainSettingsProvider : IFusionDomainSettingsProvid
     {
         domain = DomainName.Normalize(domain);
         int overrideStamp = _runtimeOverrides.GetStamp(domain);
-        if (_cache.TryGetValue(domain, out CachedSettings? cached)
+        ConcurrentDictionary<string, CachedSettings> generation = Volatile.Read(ref _cache);
+        if (generation.TryGetValue(domain, out CachedSettings? cached)
             && cached.OverrideStamp == overrideStamp)
         {
             return cached.Settings;
         }
 
         DomainFusionCacheSettings settings = CreateSettings(domain);
-        _cache[domain] = new CachedSettings
+        generation[domain] = new CachedSettings
         {
             Settings = settings,
             OverrideStamp = overrideStamp
@@ -100,8 +101,6 @@ internal sealed class FusionDomainSettingsProvider : IFusionDomainSettingsProvid
             JitterSeconds = ToNonNegSeconds(jitter),
             FactorySoftTimeoutSeconds = ToNonNegSeconds(factorySoft),
             FactoryHardTimeoutSeconds = ToNonNegSeconds(factoryHard),
-            MaxItemBytes = overlay?.MaxItemBytes
-                ?? Pick(specific.MaxItemBytes, defaults.MaxItemBytes, 0),
             AllowBackgroundDistributed = overlay?.AllowBackgroundDistributed
                 ?? Pick(specific.AllowBackgroundDistributed, defaults.AllowBackgroundDistributed, true),
             AllowBackgroundBackplane = overlay?.AllowBackgroundBackplane

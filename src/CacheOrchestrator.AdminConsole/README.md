@@ -57,11 +57,13 @@ For a direct host run, continue to [Run locally](#run-locally).
 ## Enable the Admin API on each instance
 
 ```json
-"Cache": {
-  "InstanceId": "app-1",
-  "Admin": {
-    "Enabled": true,
-    "ApiKey": "dev-admin-key"
+{
+  "Cache": {
+    "InstanceId": "app-1",
+    "Admin": {
+      "Enabled": true,
+      "ApiKey": "dev-admin-key"
+    }
   }
 }
 ```
@@ -103,7 +105,7 @@ app.MapCacheOrchestratorAdmin();
 - **AdminApiPathPrefix** must match `Cache:Admin:RoutePrefix`.  
 - **Restart required** after changing `Instances`, `ApiKey`, timeouts, or `Metrics` (bound via `IOptions` snapshot). Hint packs (`Hints`) reload without restart.  
 - Production keys belong in a secret store; put VPN/SSO in front of this host.  
-- Invalidate / Version / TTL change live cache state — see [docs/reference/admin.md — Security](../../docs/reference/admin.md#security).
+- Invalidate / Version / TTL change live cache state — see [docs/reference/admin.md — Security](../../docs/reference/admin.md#security-checklist).
 
 ### Defaults by environment
 
@@ -233,11 +235,13 @@ Traffic KPIs, time-window domain and endpoint tables, impact analysis, charts, a
 Instance process-lifetime `GET …/stats` remains available for diagnostics but is not used by the statistics UI. Prometheus must scrape the `CacheOrchestrator` meter, including measurements such as `cache_orchestrator.dc.requests` and `cache_orchestrator.factory.duration`.
 
 ```json
-"AdminConsole": {
-  "Metrics": {
-    "Enabled": true,
-    "Provider": "Prometheus",
-    "BaseUrl": "http://localhost:9090"
+{
+  "AdminConsole": {
+    "Metrics": {
+      "Enabled": true,
+      "Provider": "Prometheus",
+      "BaseUrl": "http://localhost:9090"
+    }
   }
 }
 ```

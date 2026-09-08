@@ -386,21 +386,72 @@ public class EdgeIntegrationTests
         queue.Jobs.Should().ContainSingle();
     }
 
+    [Fact]
+    public async Task StartAsync_WaitsForInitialSnapshotBeforeHostCanAcceptReloads()
+    {
+        using var release = new ManualResetEventSlim();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        IConfiguration configuration = Substitute.For<IConfiguration>();
+        IConfigurationSection section = Substitute.For<IConfigurationSection>();
+        configuration.GetSection("Cache").Returns(section);
+        configuration.GetReloadToken().Returns(new Microsoft.Extensions.Primitives.CancellationChangeToken(CancellationToken.None));
+        section.GetChildren().Returns(_ =>
+        {
+            entered.TrySetResult();
+            if (!release.Wait(TimeSpan.FromSeconds(10)))
+                throw new TimeoutException("Snapshot barrier was not released.");
+            return Array.Empty<IConfigurationSection>();
+        });
+        (EdgeDomainChangeMonitor sut, _) = CreateVersionObserver(new TestProvider(), true, configuration);
+        using (sut)
+        {
+#if NET10_0_OR_GREATER
+            Task start = sut.StartAsync(TestContext.Current.CancellationToken);
+#else
+            // Before .NET 10 the initial snapshot runs synchronously inside StartAsync.
+            Task start = Task.Run(() => sut.StartAsync(TestContext.Current.CancellationToken), TestContext.Current.CancellationToken);
+#endif
+            try
+            {
+                await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+                start.IsCompleted.Should().BeFalse("the initial snapshot is still blocked");
+            }
+            finally { release.Set(); }
+            await start;
+            await sut.StopAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task StartAsync_PropagatesInitialSnapshotFailure()
+    {
+        IConfiguration configuration = Substitute.For<IConfiguration>();
+        configuration.GetReloadToken().Returns(new Microsoft.Extensions.Primitives.CancellationChangeToken(CancellationToken.None));
+        configuration.GetSection("Cache").Returns(_ => throw new InvalidOperationException("Invalid initial snapshot."));
+        (EdgeDomainChangeMonitor sut, _) = CreateVersionObserver(new TestProvider(), true, configuration);
+        using (sut)
+        {
+            Func<Task> start = () => sut.StartAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(10));
+            await start.Should().ThrowAsync<InvalidOperationException>().WithMessage("Invalid initial snapshot.");
+        }
+    }
+
     private static (EdgeDomainChangeMonitor Observer, RecordingQueue Queue) CreateVersionObserver(
         TestProvider provider,
-        bool enabled)
+        bool enabled,
+        IConfiguration? configuration = null)
     {
         CacheOrchestratorEdgeOptions edgeOptions = CreateEdgeOptions(provider, enabled);
         IOptionsMonitor<CacheOrchestratorEdgeOptions> edgeMonitor = Substitute.For<IOptionsMonitor<CacheOrchestratorEdgeOptions>>();
         edgeMonitor.CurrentValue.Returns(edgeOptions);
         IOptionsMonitor<CacheOrchestratorOptions> coreMonitor = Substitute.For<IOptionsMonitor<CacheOrchestratorOptions>>();
         coreMonitor.CurrentValue.Returns(new CacheOrchestratorOptions { Namespace = "app" });
-        var instances = new EdgeInstanceResolver(edgeMonitor, coreMonitor, new EdgeProviderCatalog([provider], [provider]));
+        var instances = new EdgeInstanceResolver(edgeMonitor, coreMonitor, new EdgeProviderCatalog([provider], [provider]), new EdgeConfigurationRegistration(new ConfigurationBuilder().Build(), "Cache"));
         var queue = new RecordingQueue();
         ServiceProvider services = new ServiceCollection().BuildServiceProvider();
         return (
             new EdgeDomainChangeMonitor(
-                new EdgeConfigurationRegistration(new ConfigurationBuilder().Build(), "Cache"),
+                new EdgeConfigurationRegistration(configuration ?? new ConfigurationBuilder().Build(), "Cache"),
                 services,
                 new DomainEdgeOptionsProvider(edgeMonitor),
                 instances,
@@ -428,7 +479,8 @@ public class EdgeIntegrationTests
             purgeOnStartup,
             instanceName,
             "Test",
-            tagNamespace);
+            tagNamespace,
+            new EdgeInvalidationTarget(instanceName, "Test", instanceName, new Dictionary<string, string>()));
 
     private static IReadOnlyDictionary<string, System.Text.Json.JsonElement> SafetyValues(
         params (string Id, object Value)[] entries) =>
@@ -447,7 +499,7 @@ public class EdgeIntegrationTests
         IOptionsMonitor<CacheOrchestratorOptions> coreMonitor = Substitute.For<IOptionsMonitor<CacheOrchestratorOptions>>();
         coreMonitor.CurrentValue.Returns(new CacheOrchestratorOptions { Namespace = "app" });
         var catalog = new EdgeProviderCatalog([provider], [provider]);
-        var instances = new EdgeInstanceResolver(edgeMonitor, coreMonitor, catalog);
+        var instances = new EdgeInstanceResolver(edgeMonitor, coreMonitor, catalog, new EdgeConfigurationRegistration(new ConfigurationBuilder().Build(), "Cache"));
         var domainOptions = new DomainEdgeOptionsProvider(edgeMonitor);
         var projector = new EdgeTagProjector();
         var queue = new RecordingQueue();
@@ -514,6 +566,8 @@ public class EdgeIntegrationTests
         };
         public EdgeResponseMetadata? Metadata { get; private set; }
         public void ApplyResponseMetadata(HttpResponse response, EdgeResponseMetadata metadata) => Metadata = metadata;
+        public EdgeInvalidationTarget CaptureTarget(string instanceName, IConfigurationSection instanceConfiguration) =>
+            new(instanceName, Name, instanceConfiguration["Test:Target"] ?? instanceName, new Dictionary<string, string>());
         public ValueTask<EdgeInvalidationResult> InvalidateAsync(EdgeInvalidationRequest request, CancellationToken cancellationToken = default) =>
             ValueTask.FromResult(EdgeInvalidationResult.Success);
     }

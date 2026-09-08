@@ -38,6 +38,8 @@ internal sealed class HybridDataCacheProvider :
         public required HybridCacheEntryOptions EntryOptions { get; init; }
 
         public required string NamespacePrefix { get; init; }
+
+        public required HybridCacheEntryOptions ValidationReadOptions { get; init; }
     }
 
     public HybridDataCacheProvider(
@@ -100,11 +102,95 @@ internal sealed class HybridDataCacheProvider :
         if (_logger.IsEnabled(LogLevel.Debug))
             _logger.LogDebug("HybridDataCacheProvider GetOrCreate Key={Key}", physicalKey);
 
+        if (entry.ValidationKey is not null && !await IsValidAsync(entry, prepared, cancellationToken).ConfigureAwait(false))
+        {
+            await _cache.RemoveAsync(physicalKey, cancellationToken).ConfigureAwait(false);
+            return await GetOrCreateWithTagsAsync(request, factory, SelectTags<T>(request.Tags), cancellationToken).ConfigureAwait(false);
+        }
+
         DataCacheProviderOutcome outcome = entry.MaterializationId == materializationId
             ? DataCacheProviderOutcome.Materialized
             : DataCacheProviderOutcome.Cached;
         return new DataCacheProviderResult<T>(entry.Value, outcome);
     }
+
+    /// <inheritdoc />
+    public async ValueTask<DataCacheProviderResult<T>> GetOrCreateWithTagsAsync<T>(
+        DataCacheProviderRequest request,
+        Func<CancellationToken, ValueTask<T>> factory,
+        Func<T, IReadOnlyList<string>> tagSelector,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(tagSelector);
+
+        PreparedDomainOptions prepared = GetPreparedOptions(request.DomainOptions);
+        string physicalKey = Prefix(prepared.NamespacePrefix, request.Key);
+        string[] tags = PrefixTags(prepared.NamespacePrefix, request.Tags);
+        var materializationId = Guid.NewGuid();
+
+        // Only footprint-aware entries need the extra native-cache lookup. Ordinary hits keep
+        // the direct provider path. Bound retries when tags are continuously invalidated.
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            HybridProviderCacheEntry<T> entry = await _cache.GetOrCreateAsync(
+                physicalKey,
+                factory,
+                async (f, token) =>
+                {
+                    T value = await f(token).ConfigureAwait(false);
+                    IReadOnlyList<string> finalTags = tagSelector(value);
+                    ArgumentNullException.ThrowIfNull(finalTags);
+                    string validationKey = Prefix(prepared.NamespacePrefix, "co3:footprint-tags:" + Guid.NewGuid().ToString("N"));
+                    string[] validationTags = PrefixTags(prepared.NamespacePrefix, finalTags);
+                    await _cache.SetAsync(
+                        validationKey, true, prepared.EntryOptions,
+                        validationTags, token).ConfigureAwait(false);
+                    return new HybridProviderCacheEntry<T>
+                    {
+                        Value = value,
+                        MaterializationId = materializationId,
+                        ValidationKey = validationKey,
+                        ValidationTags = validationTags
+                    };
+                },
+                prepared.EntryOptions,
+                tags,
+                cancellationToken).ConfigureAwait(false);
+
+            if (entry.MaterializationId == materializationId)
+                return new DataCacheProviderResult<T>(entry.Value, DataCacheProviderOutcome.Materialized);
+
+            // SetAsync and ordinary factories already attach their complete tags directly.
+            if (entry.ValidationKey is null)
+                return new DataCacheProviderResult<T>(entry.Value, DataCacheProviderOutcome.Cached);
+
+            // A missing or invalidated marker can never become valid again: every factory
+            // execution owns a new key. L2 hits may populate L1; misses only cache false locally.
+            bool valid = await IsValidAsync(entry, prepared, cancellationToken).ConfigureAwait(false);
+            if (valid)
+                return new DataCacheProviderResult<T>(entry.Value, DataCacheProviderOutcome.Cached);
+
+            await _cache.RemoveAsync(physicalKey, cancellationToken).ConfigureAwait(false);
+        }
+
+        return new DataCacheProviderResult<T>(
+            await factory(cancellationToken).ConfigureAwait(false), DataCacheProviderOutcome.Materialized);
+    }
+
+    // Keep this rare fallback closure out of the ordinary hit path.
+    private static Func<T, IReadOnlyList<string>> SelectTags<T>(IReadOnlyList<string> tags) => _ => tags;
+
+    private ValueTask<bool> IsValidAsync<T>(
+        HybridProviderCacheEntry<T> entry, PreparedDomainOptions prepared, CancellationToken cancellationToken) =>
+        _cache.GetOrCreateAsync(
+            entry.ValidationKey!,
+            static _ => ValueTask.FromResult(false),
+            prepared.ValidationReadOptions,
+            tags: entry.ValidationTags,
+            cancellationToken: cancellationToken);
 
     /// <inheritdoc />
     public async ValueTask SetAsync<T>(
@@ -218,11 +304,17 @@ internal sealed class HybridDataCacheProvider :
         var prepared = new PreparedDomainOptions
         {
             DomainOptions = domainOptions,
-            // Fusion MaxItemBytes / fail-safe / hard TTL / eager refresh are not mapped.
+            // Fusion fail-safe / hard TTL / eager refresh are not mapped.
             EntryOptions = new HybridCacheEntryOptions
             {
                 Expiration = domainOptions.DataCacheTtl,
                 LocalCacheExpiration = domainOptions.DataCacheTtl,
+            },
+            ValidationReadOptions = new HybridCacheEntryOptions
+            {
+                Expiration = domainOptions.DataCacheTtl,
+                LocalCacheExpiration = domainOptions.DataCacheTtl,
+                Flags = HybridCacheEntryFlags.DisableDistributedCacheWrite
             },
             NamespacePrefix = BuildNamespacePrefix(domainOptions.DataCacheNamespace)
         };

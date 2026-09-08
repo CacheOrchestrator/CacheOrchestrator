@@ -2,7 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>CacheOrchestrator.Analyzers</RootNamespace>
@@ -11,7 +10,6 @@
     <IsPackable>false</IsPackable>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);RS2008</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

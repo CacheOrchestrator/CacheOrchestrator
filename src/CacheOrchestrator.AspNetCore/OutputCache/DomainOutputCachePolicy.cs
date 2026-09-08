@@ -510,7 +510,7 @@ public sealed class DomainOutputCachePolicy : IOutputCachePolicy, IFilterMetadat
         HttpContext http = context.HttpContext;
         if (http.Features.Get<ICacheOrchestratorFeature>()?.DomainOptions is { } opts)
         {
-            if (!IsCacheableStatusCode(http.Response.StatusCode, opts.CacheableStatusCodes)
+            if (!IsCacheableStatusCode(http.Response.StatusCode, opts.CacheableStatusCodesArray)
                 || http.Response.Headers.ContainsKey(HeaderNames.SetCookie)
                 || http.Response.Headers.ContainsKey(HeaderNames.Authorization))
             {
@@ -646,7 +646,7 @@ public sealed class DomainOutputCachePolicy : IOutputCachePolicy, IFilterMetadat
             HttpHelper.ApplyNoCache(response);
             client = forcedClient.Value;
         }
-        else if (IsCacheableStatusCode(sc, config.CacheableStatusCodes) ||
+        else if (IsCacheableStatusCode(sc, config.CacheableStatusCodesArray) ||
                  sc == StatusCodes.Status304NotModified)
         {
             TimeProvider timeProvider = httpContext.RequestServices.GetService<TimeProvider>() ?? TimeProvider.System;
@@ -713,7 +713,7 @@ public sealed class DomainOutputCachePolicy : IOutputCachePolicy, IFilterMetadat
     private static bool IsSharedCacheEligible(HttpContext http, DomainHttpCacheOptions options)
     {
         HttpResponse response = http.Response;
-        if ((!IsCacheableStatusCode(response.StatusCode, options.CacheableStatusCodes)
+        if ((!IsCacheableStatusCode(response.StatusCode, options.CacheableStatusCodesArray)
                 && response.StatusCode != StatusCodes.Status304NotModified)
             || response.Headers.ContainsKey(HeaderNames.SetCookie)
             || response.Headers.ContainsKey(HeaderNames.Authorization)

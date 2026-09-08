@@ -1,4 +1,5 @@
-using System.Collections.Concurrent;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Globalization;
 using System.Reflection;
 using System.Text.Json;
@@ -9,70 +10,81 @@ namespace CacheOrchestrator.Configuration;
 /// Builds the domain-settings catalog from <see cref="DomainSettingAttribute"/> on
 /// <see cref="CacheOrchestratorOptions.DomainCacheSettings"/> (including nested sections).
 /// </summary>
-public static class DomainSettingCatalog
+public sealed class DomainSettingCatalog
 {
-    private static readonly ConcurrentDictionary<bool, IReadOnlyList<DomainSettingCatalogEntry>> Cache = new();
+    private readonly IReadOnlyList<DomainSettingCatalogEntry> _entries;
+    private readonly IReadOnlyList<DomainSettingCatalogEntry> _overlays;
+    private readonly Dictionary<string, DomainSettingCatalogEntry> _byAlias = new(StringComparer.OrdinalIgnoreCase);
+    internal static DomainSettingCatalog Core { get; } = new();
 
-    private static readonly HashSet<Type> NestedSectionTypes =
-    [
-        typeof(DomainDataCacheSettings),
-    ];
+    internal DomainSettingCatalog() : this([]) { }
 
-    private static readonly ConcurrentDictionary<string, (Type Type, string IdPrefix, string PropertyPrefix)> ExtraSections =
-        new(StringComparer.OrdinalIgnoreCase);
+    private DomainSettingCatalog(IEnumerable<Section> sections)
+    {
+        _entries = Build(sections);
+        _overlays = Array.AsReadOnly(_entries.Where(static entry => entry.RuntimeOverlay).ToArray());
+        foreach (DomainSettingCatalogEntry entry in _entries)
+        {
+            AddAlias(entry.Id, entry);
+            AddAlias(entry.PropertyName, entry);
+        }
+    }
+
+    private void AddAlias(string alias, DomainSettingCatalogEntry entry)
+    {
+        if (_byAlias.TryGetValue(alias, out DomainSettingCatalogEntry? existing))
+        {
+            if (!ReferenceEquals(existing, entry))
+                throw new InvalidOperationException($"Domain setting alias '{alias}' is registered more than once.");
+            return;
+        }
+        _byAlias.Add(alias, entry);
+    }
+
+    internal static void Register(IServiceCollection services) =>
+        services.TryAddSingleton(sp => new DomainSettingCatalog(sp.GetServices<Section>()));
+
+    private sealed record Section(Type Type, string IdPrefix, string PropertyPrefix);
 
     /// <summary>
     /// Registers an additional attributed settings type under a fixed id prefix.
-    /// Clears the catalog cache so subsequent reads include the section.
+    /// Registration is scoped to the service collection. Each built provider owns an immutable catalog.
     /// </summary>
-    public static void RegisterSection(Type settingsType, string idPrefix, string propertyPrefix)
+    public static void RegisterSection(IServiceCollection services, Type settingsType, string idPrefix, string propertyPrefix)
     {
+        ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(settingsType);
         ArgumentNullException.ThrowIfNull(idPrefix);
         ArgumentNullException.ThrowIfNull(propertyPrefix);
 
-        string key = idPrefix.Length == 0 ? settingsType.AssemblyQualifiedName! : idPrefix;
-        ExtraSections[key] = (settingsType, idPrefix, propertyPrefix);
-        Cache.Clear();
+        Register(services);
+        var section = new Section(settingsType, idPrefix, propertyPrefix);
+        if (!services.Any(descriptor => descriptor.ImplementationInstance is Section registered && registered == section))
+            services.AddSingleton(section);
     }
 
     /// <summary>All attributed domain settings (config shape).</summary>
-    public static IReadOnlyList<DomainSettingCatalogEntry> GetEntries() =>
-        Cache.GetOrAdd(false, static _ => Build(overlayOnly: false));
+    public IReadOnlyList<DomainSettingCatalogEntry> GetEntries() => _entries;
 
     /// <summary>Only settings with <see cref="DomainSettingAttribute.RuntimeOverlay"/>.</summary>
-    public static IReadOnlyList<DomainSettingCatalogEntry> GetOverlayEntries() =>
-        Cache.GetOrAdd(true, static _ => Build(overlayOnly: true));
+    public IReadOnlyList<DomainSettingCatalogEntry> GetOverlayEntries() => _overlays;
 
     /// <summary>Looks up an entry by camelCase <paramref name="id"/> (case-insensitive).</summary>
-    public static DomainSettingCatalogEntry? Find(string? id)
-    {
-        if (string.IsNullOrWhiteSpace(id))
-            return null;
-        foreach (DomainSettingCatalogEntry e in GetEntries())
-        {
-            if (string.Equals(e.Id, id, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(e.PropertyName, id, StringComparison.OrdinalIgnoreCase))
-            {
-                return e;
-            }
-        }
+    public DomainSettingCatalogEntry? Find(string? id) =>
+        id is not null && _byAlias.TryGetValue(id, out DomainSettingCatalogEntry? entry) ? entry : null;
 
-        return null;
-    }
-
-    private static IReadOnlyList<DomainSettingCatalogEntry> Build(bool overlayOnly)
+    private static IReadOnlyList<DomainSettingCatalogEntry> Build(IEnumerable<Section> sections)
     {
         List<DomainSettingCatalogEntry> list = [];
-        Walk(typeof(CacheOrchestratorOptions.DomainCacheSettings), prefixId: null, prefixProperty: null, overlayOnly, list);
+        Walk(typeof(CacheOrchestratorOptions.DomainCacheSettings), prefixId: null, prefixProperty: null, overlayOnly: false, list);
 
-        foreach ((Type type, string idPrefix, string propertyPrefix) in ExtraSections.Values)
+        foreach ((Type type, string idPrefix, string propertyPrefix) in sections)
         {
             Walk(
                 type,
                 idPrefix.Length == 0 ? null : idPrefix,
                 propertyPrefix.Length == 0 ? null : propertyPrefix,
-                overlayOnly,
+                overlayOnly: false,
                 list);
         }
 
@@ -81,7 +93,7 @@ public static class DomainSettingCatalog
             int g = string.Compare(a.Group ?? "", b.Group ?? "", StringComparison.OrdinalIgnoreCase);
             return g != 0 ? g : string.Compare(a.DisplayName, b.DisplayName, StringComparison.OrdinalIgnoreCase);
         });
-        return list;
+        return list.AsReadOnly();
     }
 
     private static void Walk(
@@ -98,9 +110,9 @@ public static class DomainSettingCatalog
             string id = prefixId is null ? camel : prefixId + "." + camel;
             string propertyName = prefixProperty is null ? prop.Name : prefixProperty + "." + prop.Name;
 
-            if (NestedSectionTypes.Contains(propType))
+            if (propType == typeof(DomainDataCacheSettings))
             {
-                Walk(propType, id, propertyName, overlayOnly, list);
+                Walk(propType, id, propertyName, overlayOnly: false, list);
                 continue;
             }
 
@@ -113,7 +125,7 @@ public static class DomainSettingCatalog
             Type t = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
             IReadOnlyList<string>? enumValues = null;
             if (attr.Kind == DomainSettingValueKind.Enum && t.IsEnum)
-                enumValues = Enum.GetNames(t);
+                enumValues = Array.AsReadOnly(Enum.GetNames(t));
 
             list.Add(new DomainSettingCatalogEntry
             {

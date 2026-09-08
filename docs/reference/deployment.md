@@ -33,7 +33,7 @@ app.MapCacheOrchestratorHttpBus();
 - [Single instance (in-memory only)](#single-instance-in-memory-only)
 - [Multiple instances with Redis](#multiple-instances-with-redis)
 - [Multiple instances without Redis (InMemory Data Cache, no backplane)](#multiple-instances-without-redis-inmemory-data-cache-no-backplane)
-- [Mixed backends (Output Cache InMemory + Data Cache Redis)](#mixed-backends-output-cache-inmemory-data-cache-redis)
+- [Mixed backends (Output Cache InMemory + Data Cache Redis)](#mixed-backends-output-cache-inmemory--data-cache-redis)
 - [Using multiple Data Cache instances](#using-multiple-data-cache-instances)
 - [Shared configuration across instances](#shared-configuration-across-instances)
 - [Security checklist](#security-checklist)
@@ -238,9 +238,9 @@ This means two domains can safely map to **different Redis clusters** (e.g. GDPR
 
 Cache settings that affect **shared** cache behaviour must be the **same** on every app instance that uses the same Output Cache store and/or Fusion L2/backplane. That includes at least:
 
-- `Cache:Namespace` and per-instance Fusion namespaces  
+- `Cache:Namespace` and explicit Output Cache, Data Cache instance and Edge namespaces  
 - `Domains:*:Version` (generation stamp / key space)  
-- Domain TTLs, Client Cache Schedule, `FusionCacheInstance` mapping  
+- Domain TTLs, Client Cache Schedule, `DataCache.Instance` mapping into `DataCacheInstances`  
 - Redis connection targets (when using Redis)
 
 Hand-editing a different `appsettings.json` on each machine causes **desynchronization** (different Version → different keys; different TTLs → inconsistent behaviour). This is a general multi-instance configuration problem, not specific to CacheOrchestrator.

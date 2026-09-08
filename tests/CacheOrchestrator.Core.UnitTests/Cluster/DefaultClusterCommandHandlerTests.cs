@@ -121,6 +121,31 @@ public class DefaultClusterCommandHandlerTests
         await _invalidator.Received(1).InvalidateDomainAsync("products", Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task ApplyLocalAsync_UndefinedInvalidationKind_IsRejected()
+    {
+        InvalidateCommand command = CreateInvalidate("app1", "remote") with { Kind = (CacheInvalidationKind)999 };
+        ClusterCommandResult result = await _sut.ApplyLocalAsync(command, TestContext.Current.CancellationToken);
+        result.Status.Should().Be(ClusterCommandStatus.Rejected);
+        await _invalidator.DidNotReceive().InvalidateTagsAsync(Arg.Any<string[]>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ApplyLocalAsync_ThrownFailure_DoesNotSuppressRetry()
+    {
+        int attempts = 0;
+        _invalidator.InvalidateDomainAsync("products", Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            if (++attempts == 1)
+                throw new IOException("Unavailable");
+            return ValueTask.FromResult(new CacheInvalidationResult("products", ["domain:products"], true, true));
+        });
+        InvalidateCommand command = CreateInvalidate("app1", "remote");
+        (await _sut.ApplyLocalAsync(command, TestContext.Current.CancellationToken)).Status.Should().Be(ClusterCommandStatus.Failed);
+        (await _sut.ApplyLocalAsync(command, TestContext.Current.CancellationToken)).Status.Should().Be(ClusterCommandStatus.Applied);
+        attempts.Should().Be(2);
+    }
+
     private static InvalidateCommand CreateInvalidate(string ns, string origin) => new()
     {
         CommandId = Guid.NewGuid(),

@@ -1,49 +1,39 @@
-using CacheOrchestrator.Configuration;
-using System.Collections.Concurrent;
+using CacheOrchestrator.Admin;
 
 namespace CacheOrchestrator.FusionCache;
 
 /// <summary>Default in-memory <see cref="IFusionDomainRuntimeOverrideStore"/>.</summary>
 internal sealed class FusionDomainRuntimeOverrideStore : IFusionDomainRuntimeOverrideStore
 {
-    private readonly ConcurrentDictionary<string, FusionDomainRuntimeOverride> _map =
-        new(StringComparer.Ordinal);
-
-    private int _stamp;
-
-    /// <inheritdoc />
-    public FusionDomainRuntimeOverride? Get(string domain)
+    private readonly IDomainRuntimeOverrideStore _state;
+    public FusionDomainRuntimeOverrideStore() : this(new DomainRuntimeOverrideStore()) { }
+    public FusionDomainRuntimeOverrideStore(IDomainRuntimeOverrideStore state)
     {
-        string key = DomainName.Normalize(domain);
-        return _map.TryGetValue(key, out FusionDomainRuntimeOverride? o) ? o : null;
+        _state = state;
     }
 
-    /// <inheritdoc />
-    public int GetStamp(string domain)
-    {
-        string key = DomainName.Normalize(domain);
-        return _map.TryGetValue(key, out FusionDomainRuntimeOverride? o) ? o.Stamp : 0;
-    }
+    public FusionDomainRuntimeOverride? Get(string domain) => _state.GetSettings<FusionDomainRuntimeOverride>(domain);
+    public int GetStamp(string domain) => _state.GetStamp(domain);
 
-    /// <inheritdoc />
     public FusionDomainRuntimeOverride PatchSettings(string domain, FusionDomainSettingsPatch patch)
     {
         ArgumentNullException.ThrowIfNull(patch);
         if (!patch.HasAny)
             throw new ArgumentException("At least one Fusion setting must be set.", nameof(patch));
-
-        string key = DomainName.Normalize(domain);
-        return _map.AddOrUpdate(
-            key,
-            _ => Merge(new FusionDomainRuntimeOverride(), patch, NextStamp()),
-            (_, existing) => Merge(existing, patch, NextStamp()));
+        FusionDomainRuntimeOverride result = null!;
+        _state.Update(domain, context =>
+        {
+            result = Merge(context.Get<FusionDomainRuntimeOverride>() ?? new(), patch, context.Stamp);
+            context.Set(result);
+        });
+        return result;
     }
 
-    /// <inheritdoc />
     public bool Clear(string domain)
     {
-        string key = DomainName.Normalize(domain);
-        return _map.TryRemove(key, out _);
+        bool removed = false;
+        _state.Update(domain, context => removed = context.Remove<FusionDomainRuntimeOverride>());
+        return removed;
     }
 
     internal static FusionDomainRuntimeOverride Merge(
@@ -59,12 +49,10 @@ internal sealed class FusionDomainRuntimeOverrideStore : IFusionDomainRuntimeOve
             Jitter = patch.Jitter ?? existing.Jitter,
             FactorySoftTimeout = patch.FactorySoftTimeout ?? existing.FactorySoftTimeout,
             FactoryHardTimeout = patch.FactoryHardTimeout ?? existing.FactoryHardTimeout,
-            MaxItemBytes = patch.MaxItemBytes ?? existing.MaxItemBytes,
             AllowBackgroundDistributed = patch.AllowBackgroundDistributed ?? existing.AllowBackgroundDistributed,
             AllowBackgroundBackplane = patch.AllowBackgroundBackplane ?? existing.AllowBackgroundBackplane,
         };
 
-    private int NextStamp() => Interlocked.Increment(ref _stamp);
 }
 
 /// <summary>No-op Fusion overlay store.</summary>

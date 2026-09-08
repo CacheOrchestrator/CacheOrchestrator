@@ -1,9 +1,1 @@
 #nullable enable
-CacheOrchestrator.Edge.Cloudflare.CloudflareEdgeBuilderExtensions
-CacheOrchestrator.Edge.Cloudflare.CloudflareEdgeInstanceOptions
-CacheOrchestrator.Edge.Cloudflare.CloudflareEdgeInstanceOptions.ApiToken.get -> string?
-CacheOrchestrator.Edge.Cloudflare.CloudflareEdgeInstanceOptions.ApiToken.set -> void
-CacheOrchestrator.Edge.Cloudflare.CloudflareEdgeInstanceOptions.CloudflareEdgeInstanceOptions() -> void
-CacheOrchestrator.Edge.Cloudflare.CloudflareEdgeInstanceOptions.ZoneId.get -> string?
-CacheOrchestrator.Edge.Cloudflare.CloudflareEdgeInstanceOptions.ZoneId.set -> void
-static CacheOrchestrator.Edge.Cloudflare.CloudflareEdgeBuilderExtensions.AddCloudflare(this CacheOrchestrator.Edge.DependencyInjection.ICacheOrchestratorEdgeBuilder! builder) -> CacheOrchestrator.Edge.DependencyInjection.ICacheOrchestratorEdgeBuilder!

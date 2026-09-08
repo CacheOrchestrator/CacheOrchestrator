@@ -117,15 +117,17 @@ With `CacheOrchestrator.HttpBus`, only the process that initiated a runtime Vers
 
 Changing a domain `Version` through the Management/Admin API or configuration reload automatically enqueues a domain-tag purge when Edge is enabled for that domain. Configuration comparison is sequential and runs outside the request path. Each process observes its own configuration reload and may therefore enqueue the same idempotent purge in a multi-instance deployment.
 
-Changing `ClientCache:ScheduledUpdateUtc` does not enqueue a purge. It changes the TTL calculation for subsequent origin responses; existing Edge objects keep their stored TTL until expiry or independent invalidation. This is consistent for runtime changes, HttpBus peers, and configuration reload. Other Edge and Client Cache setting changes are also not policy-change purge triggers.
+Policy changes that affect authentication, representation identity, or restrict public cacheability automatically purge Edge entries. Enabling response `Vary` or authenticated-private protection also purges. With `applyImmediately=true`, runtime settings additionally purge Edge when the schedule moves earlier, the client TTL floor decreases, client caching changes from disabled to enabled, or ETag mode changes. Otherwise schedule and freshness changes affect subsequent origin responses; stored Edge objects retain their original TTL. Configuration reload applies the same mandatory safety rules, without the optional immediate settings purges.
 
-When configuration changes Edge from enabled to disabled, removes the domain, or changes its instance, provider, or tag namespace, CacheOrchestrator purges the previous Edge placement. A simultaneous Version and placement change purges both the old placement and the new enabled placement. Edge-disabled domains do not purge for Version-only changes.
+When configuration changes Edge from enabled to disabled, removes the domain, or changes its instance, provider, tag namespace, Cloudflare zone, or Varnish PURGE URL, CacheOrchestrator purges the previous Edge placement. A simultaneous Version and placement change purges both the old placement and the new enabled placement. Edge-disabled domains do not purge for Version-only changes.
 
 `PurgeOnStartup` defaults to `false`. When enabled for an Edge-enabled, explicitly configured domain, the host enqueues its domain purge on every startup. This covers Version changes made while an instance was stopped, but every starting replica may enqueue the same idempotent purge. Use it deliberately in large rolling deployments to avoid unnecessary provider traffic. Dynamic domains that are not present in `Cache:Domains` or the Edge domain configuration cannot be enumerated at startup.
 
 `CacheInvalidationResult.Succeeded` reports local Data Cache/Output Cache success, not successful Edge queueing or provider completion. Inspect Edge metrics and logs for those outcomes. Edge invalidation does not remove responses already cached by browsers.
 
-The built-in queue is in-memory and best-effort. It drains within the host's graceful shutdown deadline, but a process crash can lose queued work. Invalidations are idempotent. Applications requiring crash-safe delivery can register their own `IEdgeInvalidationQueue` before `AddCacheOrchestratorEdge` and persist `EdgeInvalidationJob` records in an outbox. Because the replacement contract is enqueue-only, that application also owns the durable outbox dispatcher; the built-in worker drains only its built-in channel.
+The built-in queue is in-memory and best-effort. Graceful shutdown stops accepting jobs and attempts to drain pending jobs and unfinished batches. An active provider call continues until the host's shutdown deadline; expiry cancels delivery and reports undelivered tag counts in logs and failure metrics. A process crash can lose queued work. Invalidations are idempotent. Applications requiring crash-safe delivery can register their own `IEdgeInvalidationQueue` before `AddCacheOrchestratorEdge` and persist `EdgeInvalidationJob` records in an outbox. Because the replacement contract is enqueue-only, that application also owns the durable outbox dispatcher; the built-in worker drains only its built-in channel.
+
+Each job owns an immutable `EdgeInvalidationTarget`: provider, logical instance, routing key, format version and copied provider parameters. Queued work retains its original destination and credentials after configuration reload or instance removal. Jobs only coalesce when their complete targets match. Keep the old provider implementation and credentials usable until outstanding jobs have drained. Target parameters can contain secrets: durable dispatchers must protect their stored records and must not log those parameters. `RoutingKey` identifies the cache location independently of credentials, so credential rotation alone does not purge a placement.
 
 Cloudflare currently documents a 16 KB aggregate `Cache-Tag` header limit and up to 100 tag operations per purge request. The provider encodes those limits and the worker splits batches accordingly. See [Cloudflare cache-tag limits](https://developers.cloudflare.com/cache/how-to/purge-cache/purge-by-tags/), [purge availability and rate limits](https://developers.cloudflare.com/cache/how-to/purge-cache/), and [CDN cache-control precedence](https://developers.cloudflare.com/cache/concepts/cdn-cache-control/).
 
@@ -139,7 +141,7 @@ services.AddSingleton<IEdgeInvalidationProvider, MyEdgeInvalidationProvider>();
 services.AddCacheOrchestratorEdge(configuration);
 ```
 
-`IEdgeResponseProvider` performs only synchronous response-header work. `IEdgeInvalidationProvider.InvalidateAsync` performs the remote operation and returns a structured transient/permanent result; batching and retries remain in the neutral package. Both providers declare limits and stale capabilities through `EdgeProviderCapabilities`, and startup rejects a configured policy that the selected response provider cannot preserve.
+`IEdgeResponseProvider` performs only synchronous response-header work. `IEdgeInvalidationProvider.CaptureTarget` captures destination and credentials from the instance configuration during invalidation or reload, outside the response path. `InvalidateAsync` uses that captured target and performs the remote operation and returns a structured transient/permanent result; batching and retries remain in the neutral package. Both providers declare limits and stale capabilities through `EdgeProviderCapabilities`, and startup rejects a configured policy that the selected response provider cannot preserve.
 
 ### Minimal custom provider
 
@@ -159,6 +161,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using CacheOrchestrator.Edge.Providers;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 
 public sealed class ExampleEdgeProvider : IEdgeResponseProvider, IEdgeInvalidationProvider
 {
@@ -202,6 +205,18 @@ public sealed class ExampleEdgeProvider : IEdgeResponseProvider, IEdgeInvalidati
         response.Headers["X-Example-Edge-Tags"] = string.Join(' ', metadata.Tags);
     }
 
+    // Control path: capture the destination before configuration can change.
+    public EdgeInvalidationTarget CaptureTarget(string instanceName, IConfigurationSection instanceConfiguration)
+    {
+        string url = instanceConfiguration["Example:PurgeUrl"]
+            ?? throw new InvalidOperationException("Example:PurgeUrl is required.");
+        Uri destination = new(url, UriKind.Absolute);
+        if (destination.Scheme is not ("http" or "https"))
+            throw new InvalidOperationException("Example:PurgeUrl must use HTTP or HTTPS.");
+        return new(instanceName, Name, destination.AbsoluteUri,
+            new Dictionary<string, string> { ["purgeUrl"] = destination.AbsoluteUri });
+    }
+
     // Background worker path: network I/O is expected here.
     public async ValueTask<EdgeInvalidationResult> InvalidateAsync(
         EdgeInvalidationRequest request,
@@ -212,7 +227,7 @@ public sealed class ExampleEdgeProvider : IEdgeResponseProvider, IEdgeInvalidati
         {
             HttpClient client = _httpClientFactory.CreateClient(HttpClientName);
             using HttpResponseMessage response = await client.PostAsJsonAsync(
-                "purge/tags",
+                request.Target.Parameters["purgeUrl"],
                 new { tags = request.Tags },
                 cancellationToken).ConfigureAwait(false);
 
@@ -248,12 +263,7 @@ using CacheOrchestrator.Edge.DependencyInjection;
 using CacheOrchestrator.Edge.Providers;
 using Microsoft.Extensions.DependencyInjection;
 
-Uri purgeBaseUrl = new(
-    builder.Configuration["Example:PurgeBaseUrl"]
-    ?? throw new InvalidOperationException("Example:PurgeBaseUrl is required."));
-
-builder.Services.AddHttpClient(ExampleEdgeProvider.HttpClientName, client =>
-    client.BaseAddress = purgeBaseUrl);
+builder.Services.AddHttpClient(ExampleEdgeProvider.HttpClientName);
 builder.Services.AddSingleton<ExampleEdgeProvider>();
 builder.Services.AddSingleton<IEdgeResponseProvider>(services =>
     services.GetRequiredService<ExampleEdgeProvider>());
@@ -268,13 +278,11 @@ The example deliberately uses `Example` for the provider's `Name`, named `HttpCl
 
 ```json
 {
-  "Example": {
-    "PurgeBaseUrl": "https://edge-control.internal/"
-  },
   "Cache": {
     "EdgeInstances": {
       "public-edge": {
-        "Provider": "Example"
+        "Provider": "Example",
+        "Example": { "PurgeUrl": "https://edge-control.internal/purge/tags" }
       }
     },
     "Domains": {
@@ -293,12 +301,12 @@ The example deliberately uses `Example` for the provider's `Name`, named `HttpCl
 The runtime path is intentionally split:
 
 1. A cacheable `GET`/`HEAD` response calls `ApplyResponseMetadata`; this is the only provider code on the response and Output Cache path.
-2. A domain/entity invalidation projects tags and enqueues an `EdgeInvalidationJob`; it does not call the provider network API.
-3. The built-in hosted worker coalesces jobs, applies `MaxInvalidationBatchSize`, and calls `InvalidateAsync`; transient results are retried according to `Cache:EdgeQueue`.
+2. A domain/entity invalidation projects tags, captures the provider target once per instance, and enqueues an `EdgeInvalidationJob`; it does not call the provider network API.
+3. The built-in hosted worker coalesces jobs with equal targets, applies `MaxInvalidationBatchSize`, and calls `InvalidateAsync`; transient results are retried according to `Cache:EdgeQueue`.
 
 The response path is not zero-cost: neutral tag projection, string formatting, and header writes still occur. The important boundary is that it performs no provider network I/O and starts no detached work, so provider latency is kept out of Output Cache response processing.
 
-Do not start background work with `Task.Run` from `ApplyResponseMetadata` or `InvalidateAsync`. Let `InvalidateAsync` represent one awaited provider batch. This single-endpoint example intentionally does not use `request.InstanceName`; a reusable production package should use it to resolve strongly typed per-instance settings and should add startup validation, authentication, sanitized errors, timeout handling, and provider-focused tests. Those details are omitted here to keep the execution boundary visible.
+Do not start background work with `Task.Run` from `ApplyResponseMetadata` or `InvalidateAsync`. Let `InvalidateAsync` represent one awaited provider batch. Use `request.Target` throughout delivery; resolving current instance configuration at this point would redirect old jobs after a reload. A production package should also add startup validation, authentication, sanitized errors, timeout handling, and provider-focused tests. Those details are omitted here to keep the execution boundary visible.
 
 ## Varnish VCL contract
 
@@ -375,7 +383,7 @@ dotnet test tests/CacheOrchestrator.IntegrationTests/CacheOrchestrator.Integrati
   --filter FullyQualifiedName~VarnishEdgeDockerTests
 ```
 
-For an interactive version of the same flow, run [Playground Lab 06](../../samples/CacheOrchestrator.Sample/labs/README.md#stage-06-varnish-edge). It places Varnish in front of the Stage 02 single-origin/Redis-L2 topology; the origin remains internal to the Compose network.
+For an interactive version of the same flow, run [Playground Lab 06](../../samples/CacheOrchestrator.Sample/labs/README.md#stage-06--varnish-edge). It places Varnish in front of the Stage 02 single-origin/Redis-L2 topology; the origin remains internal to the Compose network.
 
 ## Operational signals
 

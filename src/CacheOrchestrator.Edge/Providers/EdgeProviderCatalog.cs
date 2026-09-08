@@ -13,6 +13,11 @@ internal sealed class EdgeProviderCatalog
         ArgumentNullException.ThrowIfNull(invalidationProviders);
         _responseProviders = BuildMap(responseProviders, static provider => provider.Name, "response");
         _invalidationProviders = BuildMap(invalidationProviders, static provider => provider.Name, "invalidation");
+        foreach (IEdgeInvalidationProvider provider in _invalidationProviders.Values)
+        {
+            if (provider.Capabilities.MaxInvalidationBatchSize <= 0)
+                throw new InvalidOperationException($"Edge invalidation provider '{provider.Name}' must declare a positive batch size.");
+        }
     }
 
     public ResolvedEdgeProvider Resolve(string name)

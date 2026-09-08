@@ -77,6 +77,7 @@ Before starting a large implementation, open an issue so the scope and package o
 ### Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download), which can build the library targets `net8.0` and `net10.0`.
+- .NET SDK 8.0.400 or a later 8.0.4xx servicing patch for the native SDK 8 package-consumer gate.
 - Docker when running Redis integration tests or the playground topology labs.
 
 The Admin Console App, its tests, and the samples target `net10.0`. Packaged libraries and their tests target both `net8.0` and `net10.0`.

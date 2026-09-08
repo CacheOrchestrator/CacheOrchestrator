@@ -1,5 +1,4 @@
 using CacheOrchestrator.DependencyInjection;
-using CacheOrchestrator.Invalidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,7 +14,7 @@ namespace CacheOrchestrator.EFCore;
 public static class CacheOrchestratorEfCoreServiceExtensions
 {
     /// <summary>
-    /// Binds <c>{section}:EFCore:Invalidation</c> and registers the SaveChanges interceptor.
+    /// Binds <c>{section}:EFCore:Invalidation</c> and registers the SaveChanges and transaction interceptors.
     /// Does not attach the interceptor to any <c>DbContext</c> — call
     /// <see cref="AddCacheOrchestratorInvalidation"/> on the options builder.
     /// </summary>
@@ -40,8 +39,9 @@ public static class CacheOrchestratorEfCoreServiceExtensions
             options.PostConfigure(configure);
 
         services.TryAddSingleton<IEntityCacheMappingResolver, EntityCacheMappingResolver>();
+        services.TryAddSingleton<CacheInvalidationTransactionInterceptor>();
         services.TryAddSingleton(sp => new CacheInvalidationSaveChangesInterceptor(
-            sp.GetRequiredService<ICacheOrchestratorInvalidator>(),
+            sp.GetRequiredService<CacheInvalidationTransactionInterceptor>(),
             sp.GetRequiredService<IEntityCacheMappingResolver>(),
             sp.GetRequiredService<IOptionsMonitor<EfCoreInvalidationOptions>>(),
             sp.GetRequiredService<ILogger<CacheInvalidationSaveChangesInterceptor>>()));
@@ -64,7 +64,7 @@ public static class CacheOrchestratorEfCoreServiceExtensions
     }
 
     /// <summary>
-    /// Attaches the CacheOrchestrator invalidation interceptor registered in the service provider.
+    /// Attaches the CacheOrchestrator SaveChanges and transaction interceptors registered in the service provider.
     /// </summary>
     /// <param name="options">The DbContext options builder.</param>
     /// <param name="services">The application service provider (from <c>AddDbContext</c> factory).</param>
@@ -75,7 +75,9 @@ public static class CacheOrchestratorEfCoreServiceExtensions
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(services);
-        options.AddInterceptors(services.GetRequiredService<CacheInvalidationSaveChangesInterceptor>());
+        options.AddInterceptors(
+            services.GetRequiredService<CacheInvalidationSaveChangesInterceptor>(),
+            services.GetRequiredService<CacheInvalidationTransactionInterceptor>());
         return options;
     }
 }

@@ -30,16 +30,22 @@ public sealed class DuplicateCacheIdentityHttpMethodAnalyzer : DiagnosticAnalyze
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
-        context.RegisterSymbolAction(AnalyzeMethod, SymbolKind.Method);
+        context.RegisterCompilationStartAction(start =>
+        {
+            INamedTypeSymbol? identity = start.Compilation.GetTypeByMetadataName("CacheOrchestrator.Identity.CacheIdentityAttribute");
+            INamedTypeSymbol? contentHash = start.Compilation.GetTypeByMetadataName("CacheOrchestrator.Identity.ContentHashCacheIdentityAttribute");
+            if (identity is not null || contentHash is not null)
+                start.RegisterSymbolAction(symbol => AnalyzeMethod(symbol, identity, contentHash), SymbolKind.Method);
+        });
     }
 
-    private static void AnalyzeMethod(SymbolAnalysisContext context)
+    private static void AnalyzeMethod(SymbolAnalysisContext context, INamedTypeSymbol? identity, INamedTypeSymbol? contentHash)
     {
         var method = (IMethodSymbol)context.Symbol;
         if (method.MethodKind != MethodKind.Ordinary)
             return;
 
-        List<(string HttpMethod, AttributeData Attribute)> bindings = CollectBindings(method);
+        List<(string HttpMethod, AttributeData Attribute)> bindings = CollectBindings(method, identity, contentHash);
         if (bindings.Count == 0)
             return;
 
@@ -73,7 +79,7 @@ public sealed class DuplicateCacheIdentityHttpMethodAnalyzer : DiagnosticAnalyze
         }
     }
 
-    private static List<(string HttpMethod, AttributeData Attribute)> CollectBindings(IMethodSymbol method)
+    private static List<(string HttpMethod, AttributeData Attribute)> CollectBindings(IMethodSymbol method, INamedTypeSymbol? identity, INamedTypeSymbol? contentHash)
     {
         var result = new List<(string, AttributeData)>();
 
@@ -90,7 +96,7 @@ public sealed class DuplicateCacheIdentityHttpMethodAnalyzer : DiagnosticAnalyze
         for (int i = types.Count - 1; i >= 0; i--)
         {
             foreach (AttributeData attribute in types[i].GetAttributes())
-                AppendMethods(attribute, result);
+                AppendMethods(attribute, result, identity, contentHash);
         }
 
         var methods = new List<IMethodSymbol>();
@@ -100,7 +106,7 @@ public sealed class DuplicateCacheIdentityHttpMethodAnalyzer : DiagnosticAnalyze
         for (int i = methods.Count - 1; i >= 0; i--)
         {
             foreach (AttributeData attribute in methods[i].GetAttributes())
-                AppendMethods(attribute, result);
+                AppendMethods(attribute, result, identity, contentHash);
         }
 
         return result;
@@ -108,9 +114,12 @@ public sealed class DuplicateCacheIdentityHttpMethodAnalyzer : DiagnosticAnalyze
 
     private static void AppendMethods(
         AttributeData attribute,
-        List<(string HttpMethod, AttributeData Attribute)> result)
+        List<(string HttpMethod, AttributeData Attribute)> result,
+        INamedTypeSymbol? identity, INamedTypeSymbol? contentHash)
     {
-        if (!IsCacheIdentityAttribute(attribute))
+        if (attribute.AttributeClass is null
+            || (!SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, identity)
+                && !SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, contentHash)))
             return;
 
         if (attribute.ConstructorArguments.Length == 0)
@@ -129,21 +138,4 @@ public sealed class DuplicateCacheIdentityHttpMethodAnalyzer : DiagnosticAnalyze
         }
     }
 
-    private static bool IsCacheIdentityAttribute(AttributeData attribute)
-    {
-        INamedTypeSymbol? type = attribute.AttributeClass;
-        if (type is null)
-            return false;
-
-        string name = type.Name;
-        if (name is "CacheIdentity" or "CacheIdentityAttribute"
-            or "ContentHashCacheIdentity" or "ContentHashCacheIdentityAttribute")
-        {
-            return true;
-        }
-
-        string fullName = type.ToDisplayString();
-        return fullName is "CacheOrchestrator.Identity.CacheIdentityAttribute"
-            or "CacheOrchestrator.Identity.ContentHashCacheIdentityAttribute";
-    }
 }

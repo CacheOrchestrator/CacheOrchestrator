@@ -1,0 +1,15 @@
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <Include>[CacheOrchestrator*]*</Include>
+          <Exclude>[*.UnitTests]*,[*.IntegrationTests]*</Exclude>
+          <ExcludeByAttribute>GeneratedCodeAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
+          <UseSourceLink>true</UseSourceLink>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

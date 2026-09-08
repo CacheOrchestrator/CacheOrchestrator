@@ -1,12 +1,12 @@
 # Client cache busting and invalidation
 
-> **Guide** — extend the [README quick start](../../README.md#quick-start) with application-owned browser cache busting and TanStack Query synchronization. These examples use existing CO APIs; no additional CO feature or client package is required.
+> **Guide** — extend the [README quick start](../../README.md#quick-start) with application-owned browser cache busting and TanStack Query synchronization. These examples use existing CacheOrchestrator APIs; no additional CacheOrchestrator feature or client package is required.
 
 ## Start with the right client TTL
 
 When a browser receives a response with a long `max-age`, it can reuse that response without sending another request. Invalidating Output Cache, Data Cache, or Edge Cache cannot remove the copy already stored in that browser. A product saved on the server can therefore remain unchanged on an open client's next read.
 
-First choose a client TTL that matches the acceptable age of the data. A long TTL suits a stable published catalog; frequently changing records usually need a shorter one. Server TTLs can remain different: CO configures each layer independently.
+First choose a client TTL that matches the acceptable age of the data. A long TTL suits a stable published catalog; frequently changing records usually need a shorter one. Server TTLs can remain different: CacheOrchestrator configures each layer independently.
 
 For a planned publication, use **[Client Cache Schedule](client-cache-schedule.md)**. `ScheduledUpdateUtc`, `TtlSeconds`, and `TtlMinSeconds` reduce the client lifetime as the cutover approaches and also reduce fresh TTL for an enabled CacheOrchestrator Edge integration. This affects metadata on responses being stored; it cannot rewrite headers on copies already in the browser or Edge, and it does not publish or purge data. Changing the scheduled date affects the next origin response.
 
@@ -50,25 +50,27 @@ This is a cache-freshness policy, not a guarantee that a session reads an immuta
 Replace the quick start's `catalog` domain with the following snapshot policy. Retain its root provider/namespace settings.
 
 ```json
-"catalog": {
-  "Version": "2026-09",
-  "IgnoreQueryKeys": ["co_v"],
-  "DataCache": { "TtlSeconds": 3600 },
-  "OutputCache": { "TtlSeconds": 300 },
-  "ClientCache": {
-    "Cacheability": "Public",
-    "TtlSeconds": 86400
+{
+  "catalog": {
+    "Version": "2026-09",
+    "IgnoreQueryKeys": ["co_v"],
+    "DataCache": { "TtlSeconds": 3600 },
+    "OutputCache": { "TtlSeconds": 300 },
+    "ClientCache": {
+      "Cacheability": "Public",
+      "TtlSeconds": 86400
+    }
   }
 }
 ```
 
-`IgnoreQueryKeys` belongs at the domain root. Here, `co_v` changes the URL seen by the browser and CDN, while CO excludes it from query-based OC/DC key material. The effective domain `Version` already selects the server cache generation, so an additional query variation would create redundant entries for that generation.
+`IgnoreQueryKeys` belongs at the domain root. Here, `co_v` changes the URL seen by the browser and CDN, while CacheOrchestrator excludes it from query-based OC/DC key material. The effective domain `Version` already selects the server cache generation, so an additional query variation would create redundant entries for that generation.
 
-Leave `VaryByQueryKeys` at its default (`null`) to retain other non-tracking query dimensions, such as `language` or `category`. If your application inherits an explicit allowlist, include all parameters that actually change the response. `co_v` is an application convention, not a reserved CO parameter. Only ignore it because the endpoint does not use it to select content; an API that serves a requested historical version must include that selection in its cache identity. See [vary dimensions](../reference/vary.md).
+Leave `VaryByQueryKeys` at its default (`null`) to retain other non-tracking query dimensions, such as `language` or `category`. If your application inherits an explicit allowlist, include all parameters that actually change the response. `co_v` is an application convention, not a reserved CacheOrchestrator parameter. Only ignore it because the endpoint does not use it to select content; an API that serves a requested historical version must include that selection in its cache identity. See [vary dimensions](../reference/vary.md).
 
 ### Expose the current version
 
-Add an application-owned endpoint using CO's effective domain options:
+Add an application-owned endpoint using CacheOrchestrator's effective domain options:
 
 ```csharp
 app.MapGet("/api/cache/catalog-version", (
@@ -133,7 +135,7 @@ There is one extra startup request, not an extra request before every read. If y
 
 Publish the data and configured `Version` coherently across instances. Change the version for corrections that must change client URLs; `InvalidateDomainAsync` alone does not change `Version`. Do not reuse a version for different content. The URL is a cache identity, not historical data selection: an old URL reaching the origin can return current application data.
 
-Configure the CDN to include `co_v` in its cache key. CO's `IgnoreQueryKeys` setting applies to its server key material; do not copy that exclusion to the CDN. Changing the browser URL cannot bypass an Edge rule that ignores that parameter.
+Configure the CDN to include `co_v` in its cache key. CacheOrchestrator's `IgnoreQueryKeys` setting applies to its server key material; do not copy that exclusion to the CDN. Changing the browser URL cannot bypass an Edge rule that ignores that parameter.
 
 ### Option B: keep the URL and control fetch caching
 
@@ -146,11 +148,11 @@ if (!response.ok) throw new Error(`Catalog read failed: ${response.status}`);
 const catalog = await response.json();
 ```
 
-This is simpler if the application reads the catalog once at startup and keeps it in application memory. No version is needed to bypass the browser HTTP cache. Repeated calls using `no-store` each make a network request; server-side CO caching still follows its configured policy.
+This is simpler if the application reads the catalog once at startup and keeps it in application memory. No version is needed to bypass the browser HTTP cache. Repeated calls using `no-store` each make a network request; server-side CacheOrchestrator caching still follows its configured policy.
 
 If you want to refresh the browser's HTTP cache for later ordinary reads, use `cache: 'reload'` instead. `cache: 'no-cache'` asks for revalidation and can reuse a response validated with `304`. Neither option deletes arbitrary browser cache entries, and `no-store` does not remove previously stored copies. See [Fetch cache modes](https://developer.mozilla.org/en-US/docs/Web/API/Request/cache).
 
-These options control browser HTTP caching. They do not independently purge a CDN, CO cache, or service-worker-managed cache. Coordinate those layers when fresh origin data is required. For option B alone, the `co_v` ignore setting is unnecessary because the client sends no version parameter.
+These options control browser HTTP caching. They do not independently purge a CDN, CacheOrchestrator cache, or service-worker-managed cache. Coordinate those layers when fresh origin data is required. For option B alone, the `co_v` ignore setting is unnecessary because the client sends no version parameter.
 
 ## 2. Client cache invalidation for changing products
 
@@ -162,7 +164,7 @@ There are two steps to coordinate: retire the server's cached product after the 
 
 As a concrete example, we will use **TanStack Query**, a library for fetching and caching server data in the application. It tracks loading and error states, reuses query results, and can mark selected results stale and refetch active views. Its cache holds application data in JavaScript memory; it is separate from the browser's HTTP cache.
 
-CO owns the server domain policy and invalidation. TanStack Query owns the displayed query state. The application connects them through the save-success callback, with polling or SignalR when other users can change the data. The same pattern can be implemented with another client-state library. See [TanStack query invalidation](https://tanstack.com/query/latest/docs/framework/react/guides/query-invalidation).
+CacheOrchestrator owns the server domain policy and invalidation. TanStack Query owns the displayed query state. The application connects them through the save-success callback, with polling or SignalR when other users can change the data. The same pattern can be implemented with another client-state library. See [TanStack query invalidation](https://tanstack.com/query/latest/docs/framework/react/guides/query-invalidation).
 
 The example progresses from refreshing the current user's screen after a save to observing external changes. It uses domain **`product`** and entity kind **`products`**, replacing the quick start's product routes; do not register both versions of the same route.
 
@@ -171,11 +173,13 @@ The example progresses from refreshing the current user's screen after a save to
 Add this domain beside `catalog`:
 
 ```json
-"product": {
-  "Version": "1",
-  "DataCache": { "TtlSeconds": 300 },
-  "OutputCache": { "TtlSeconds": 120 },
-  "ClientCache": { "Cacheability": "NoStore" }
+{
+  "product": {
+    "Version": "1",
+    "DataCache": { "TtlSeconds": 300 },
+    "OutputCache": { "TtlSeconds": 120 },
+    "ClientCache": { "Cacheability": "NoStore" }
+  }
 }
 ```
 
@@ -250,13 +254,13 @@ const save = useMutation({
 First read → GET → OC MISS → DC MISS → repository → caches → UI
 Manual refetch → GET → OC HIT (while valid) → UI
 
-Save → PUT → commit → CO invalidation → successful response
+Save → PUT → commit → CacheOrchestrator invalidation → successful response
      → TanStack onSuccess → query invalidation → GET → updated UI
 ```
 
 The active query refetches even with infinite stale time because it was explicitly invalidated. TanStack's abort signal allows old reads to be cancelled before the mutation. There are two requests per save: a write and a read. No version discovery or additional client token is involved.
 
-CO does not automatically invalidate TanStack: the mutation callback is the bridge. Another user's write does not run this tab's callback. Add one of the following to synchronize external changes.
+CacheOrchestrator does not automatically invalidate TanStack: the mutation callback is the bridge. Another user's write does not run this tab's callback. Add one of the following to synchronize external changes.
 
 ### Simple extension: polling
 
@@ -270,13 +274,13 @@ refetchOnWindowFocus: 'always',
 refetchOnReconnect: 'always'
 ```
 
-Keep `onSuccess` for immediate refresh after this user's write. Another user's write invalidates CO; the next poll retrieves updated data. Polling runs independently of stale time. The interval is approximate, not a maximum staleness guarantee: offline operation and browser throttling affect timing.
+Keep `onSuccess` for immediate refresh after this user's write. Another user's write invalidates CacheOrchestrator; the next poll retrieves updated data. Polling runs independently of stale time. The interval is approximate, not a maximum staleness guarantee: offline operation and browser throttling affect timing.
 
 Use this when several seconds of delay are acceptable. It adds regular GETs for active queries but no notification infrastructure. Those reads can still hit fresh server caches.
 
 ### Prompt extension: SignalR
 
-SignalR can carry CO invalidation tags to other open tabs. Register this application-owned bridge before `Build()` and map its hub after `Build()`:
+SignalR can carry CacheOrchestrator invalidation tags to other open tabs. Register this application-owned bridge before `Build()` and map its hub after `Build()`:
 
 ```csharp
 builder.Services.AddSignalR();
@@ -358,13 +362,13 @@ try {
 This tag mapping assumes positive integer product IDs. Active matching queries refetch; inactive ones become stale for their next use. Disabled queries need explicit application handling.
 
 ```text
-User A saves → CO invalidates → observer sends tags
+User A saves → CacheOrchestrator invalidates → observer sends tags
 User B receives tags → TanStack invalidates → GET → updated UI
 ```
 
 Keep mutation `onSuccess` even with SignalR: it works when the event connection is unavailable. The event and callback can cause an extra/cancelled read depending on timing. This example does not promise exactly one refetch per write.
 
-For recovery, retain focus refresh and optional slower polling (for example 60 seconds). SignalR automatic reconnect does not retry the initial start failure and can exhaust its reconnect attempts. Reconnect refresh replaces event replay here; observer failures are logged by CO, not durably retried. See [SignalR client behaviour](https://learn.microsoft.com/en-us/aspnet/core/signalr/javascript-client?view=aspnetcore-10.0).
+For recovery, retain focus refresh and optional slower polling (for example 60 seconds). SignalR automatic reconnect does not retry the initial start failure and can exhaust its reconnect attempts. Reconnect refresh replaces event replay here; observer failures are logged by CacheOrchestrator, not durably retried. See [SignalR client behaviour](https://learn.microsoft.com/en-us/aspnet/core/signalr/javascript-client?view=aspnetcore-10.0).
 
 ## What synchronization guarantees
 
@@ -375,7 +379,7 @@ The product example connects writes, server invalidation, notifications, and UI 
 - **Edge and service workers:** a client refetch must not be satisfied by another stale layer. Coordinate existing Edge invalidation and service-worker policy; browser fetch options are not a universal purge.
 - **Identity changes:** scope private query state to the user/tenant and clear obsolete state on logout or identity changes.
 
-CO already supplies the building blocks: effective domain versions, query vary settings, client cache policies, Client Cache Schedule, entity invalidation, and observer hooks. The application chooses how its clients discover versions and react to changes; it does not need a new CO client cache subsystem.
+CacheOrchestrator already supplies the building blocks: effective domain versions, query vary settings, client cache policies, Client Cache Schedule, entity invalidation, and observer hooks. The application chooses how its clients discover versions and react to changes; it does not need a new CacheOrchestrator client cache subsystem.
 
 ## Related reading
 

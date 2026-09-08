@@ -1,9 +1,29 @@
 using System.Threading.Channels;
+using CacheOrchestrator.Edge.Providers;
 
 namespace CacheOrchestrator.Edge.Invalidation;
 
 /// <summary>One provider-neutral invalidation job containing only opaque projected tags.</summary>
-public sealed record EdgeInvalidationJob(string InstanceName, string ProviderName, IReadOnlyList<string> Tags);
+public sealed class EdgeInvalidationJob
+{
+    /// <summary>Creates a job and copies its tags for safe queue ownership.</summary>
+    public EdgeInvalidationJob(EdgeInvalidationTarget target, IReadOnlyList<string> tags)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(tags);
+        Target = target;
+        Tags = Array.AsReadOnly(tags.ToArray());
+    }
+
+    /// <summary>The original routing and credentials snapshot.</summary>
+    public EdgeInvalidationTarget Target { get; }
+    /// <summary>The target's logical instance.</summary>
+    public string InstanceName => Target.InstanceName;
+    /// <summary>The target's provider.</summary>
+    public string ProviderName => Target.ProviderName;
+    /// <summary>Copied opaque projected tags.</summary>
+    public IReadOnlyList<string> Tags { get; }
+}
 
 /// <summary>Queue boundary for edge invalidation; replace it to use a durable outbox.</summary>
 public interface IEdgeInvalidationQueue

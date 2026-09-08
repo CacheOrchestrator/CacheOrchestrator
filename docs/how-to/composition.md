@@ -438,7 +438,7 @@ app.MapPut("/api/products/{id:int}", async (int id, UpdatePriceBody body, AppDbC
 {
     Product product = await db.Products.SingleAsync(x => x.Id == id, ct);
     product.Price = body.Price;
-    await db.SaveChangesAsync(ct); // interceptor invalidates entity tags — no manual Invalidate*
+    await db.SaveChangesAsync(ct); // invalidation follows the owning transaction's commit
     return Results.NoContent();
 });
 ```

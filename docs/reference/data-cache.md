@@ -242,6 +242,8 @@ Stampede protection and fail-safe stale serve come from FusionCache itself. Nest
 
 Effective Fusion settings are merged and cached per normalized domain and runtime-override stamp. Prepared `FusionCacheEntryOptions` are also reused while the Core and Fusion snapshots are unchanged, so a normal L1 hit does not traverse Configuration Binder or rebuild entry options. Configuration reload and Admin overrides replace the cached snapshots.
 
+Footprint factories select their complete tags inside the Fusion factory context, before Fusion publishes that value. There is no second Core overwrite after a miss; background refresh carries the new members, dependencies and aliases with its value.
+
 The provider stores a small typed envelope around the application value so it can distinguish a value materialized by the current call from a cached or fail-safe stale value. Every node that shares that L2 store must run a build that understands the same envelope.
 
 ---
@@ -262,6 +264,8 @@ builder.Services.AddCacheOrchestratorHybridCache();
 - Nested **`FusionCache`** settings are ignored (no fail-safe / hard TTL / factory timeouts / named Fusion instances).
 - Optional L2: configure HybridCache / `IDistributedCache` as usual (outside this package) — not Fusion `AddRedisBackend`.
 - Prefer **Fusion** when you need fail-safe, eager refresh, or the full Fusion surface.
+
+Footprint-aware entries use a unique validity marker stored with their complete tags before the payload is published. A footprint hit checks that marker through HybridCache; a missing or invalidated marker causes a refresh. The marker and payload both use the domain TTL and native L1/L2 storage. This costs one extra native lookup for footprint hits and one marker write for each materialization; ordinary `GetOrSetAsync` hits keep the direct path. After three consecutive invalidated generations, the current call runs its factory uncached to bound retry work. Native HybridCache tag propagation and expiration guarantees still apply.
 
 Like the Fusion provider, HybridCache stores an internal typed envelope used to report whether this call materialized the returned value. Run the same package build on every node that shares that distributed store.
 

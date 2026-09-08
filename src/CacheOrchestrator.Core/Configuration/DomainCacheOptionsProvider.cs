@@ -15,7 +15,7 @@ internal sealed class DomainCacheOptionsProvider : IDomainCacheOptionsProvider, 
     private readonly ILogger<DomainCacheOptionsProvider> _logger;
     private readonly IOptionsMonitor<CacheOrchestratorOptions> _optionsMonitor;
     private readonly IDomainRuntimeOverrideStore _runtimeOverrides;
-    private readonly ConcurrentDictionary<string, CachedDomainOptions> _globalCache = new(StringComparer.Ordinal);
+    private ConcurrentDictionary<string, CachedDomainOptions> _globalCache = new(StringComparer.Ordinal);
     private readonly IDisposable? _changeRegistration;
 
     public DomainCacheOptionsProvider(
@@ -32,10 +32,11 @@ internal sealed class DomainCacheOptionsProvider : IDomainCacheOptionsProvider, 
 
         _changeRegistration = _optionsMonitor.OnChange(_ =>
         {
+            ConcurrentDictionary<string, CachedDomainOptions> retired = Interlocked.Exchange(
+                ref _globalCache, new(StringComparer.Ordinal));
             _logger.LogInformation(
-                "Configuration changed: clearing Core domain snapshot cache (purged {Count} items).",
-                _globalCache.Count);
-            _globalCache.Clear();
+                "Configuration changed: replaced Core domain snapshot generation ({Count} retired items).",
+                retired.Count);
         });
     }
 
@@ -52,14 +53,16 @@ internal sealed class DomainCacheOptionsProvider : IDomainCacheOptionsProvider, 
         domain = DomainName.Normalize(domain);
         int stamp = _runtimeOverrides.GetStamp(domain);
 
-        if (_globalCache.TryGetValue(domain, out CachedDomainOptions? cached)
+        // Publish only into the generation captured before resolving configuration.
+        ConcurrentDictionary<string, CachedDomainOptions> generation = Volatile.Read(ref _globalCache);
+        if (generation.TryGetValue(domain, out CachedDomainOptions? cached)
             && cached.OverrideStamp == stamp)
         {
             return cached.Options;
         }
 
         DomainCacheOptions options = CreateDomainOptions(domain);
-        _globalCache[domain] = new CachedDomainOptions { Options = options, OverrideStamp = stamp };
+        generation[domain] = new CachedDomainOptions { Options = options, OverrideStamp = stamp };
         return options;
     }
 

@@ -425,6 +425,19 @@ public class AdminFanOutServiceTests
     }
 
     [Fact]
+    public async Task GetDomainSettingsCatalogAsync_WhenAllInstancesFail_DoesNotInventSettings()
+    {
+        FakeAdminApiClient client = new();
+        client.FailCatalog.UnionWith(["a", "b"]);
+        AdminFanOutService sut = CreateSut(client,
+            new AdminInstanceOptions { Id = "a", Url = "http://a" },
+            new AdminInstanceOptions { Id = "b", Url = "http://b" });
+        AdminDomainSettingsCatalogDto catalog =
+            await sut.GetDomainSettingsCatalogAsync(TestContext.Current.CancellationToken);
+        catalog.Settings.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task SetVersionAsync_WhenBusAvailable_UsesSingleOriginDistribute()
     {
         FakeAdminApiClient client = new();

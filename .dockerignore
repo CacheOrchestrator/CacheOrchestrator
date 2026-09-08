@@ -27,3 +27,4 @@ docs
 !docs/assets/logo-small.png
 # Repo-root Admin operator files (not needed for image builds)
 deploy
+**/.artifacts

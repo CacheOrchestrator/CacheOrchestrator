@@ -300,7 +300,10 @@ internal sealed class DomainDataCacheService : IDomainDataCache
                         try
                         {
                             FootprintCacheBox<T?> produced = await factory(token).ConfigureAwait(false);
-                            EntityFootprint full = WithRequestPrimary(http, produced.Footprint);
+                            // Background refresh may finish after the request has been disposed.
+                            EntityFootprint full = primary is { } capturedPrimary
+                                ? produced.Footprint.WithPrimary(capturedPrimary)
+                                : produced.Footprint;
                             return new FootprintCacheBox<T?>
                             {
                                 Value = produced.Value,
@@ -692,7 +695,7 @@ internal sealed class DomainDataCacheService : IDomainDataCache
         }
 
         CacheIdentityMaterial? material = await CacheIdentityApplicator
-            .BuildAsync(binding, http, opts, CacheVarySurface.Fusion, _logger, cancellationToken)
+            .BuildAsync(binding, http, opts, CacheVarySurface.DataCache, _logger, cancellationToken)
             .ConfigureAwait(false);
 
         if (material is null)

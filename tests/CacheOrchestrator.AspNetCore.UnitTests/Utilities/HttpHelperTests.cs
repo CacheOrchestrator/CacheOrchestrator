@@ -99,94 +99,37 @@ public class HttpHelperTests
             .Should().Be("no-cache");
     }
 
-    // =========================
-    // NormalizeAcceptEncoding
-    // =========================
-
-    [Fact]
-    public void NormalizeAcceptEncoding_WhenMatchingEncoding_SetsToFirstMatch()
+    [Theory]
+    [InlineData("GZIP", "gzip")]
+    [InlineData("  gzip  ", "gzip")]
+    [InlineData("gzip, deflate, br", "gzip, deflate, br")]
+    [InlineData("br;q=0,gzip;q=1,*;q=0.5", "br;q=0,gzip;q=1,*;q=0.5")]
+    [InlineData("application/json;q=0,application/*;q=1", "application/json;q=0,application/*;q=1")]
+    [InlineData("application/xml, */*", "application/xml, */*")]
+    [InlineData("application/json;profile=first", "application/json;profile=first")]
+    [InlineData("application/json-seq", "application/json-seq")]
+    [InlineData("en-US", "en-US")]
+    [InlineData("en;q=0,sl;q=1", "en;q=0,sl;q=1")]
+    [InlineData("identity", "identity")]
+    [InlineData("", "")]
+    public void NormalizeNegotiationHeader_PreservesRepresentationIdentity(string header, string expected)
     {
-        var http = new DefaultHttpContext();
-        http.Request.Headers.AcceptEncoding = "gzip, deflate, br";
-
-        HttpHelper.NormalizeAcceptEncoding(http, ["br", "gzip"]);
-
-        http.Request.Headers.AcceptEncoding.ToString().Should().Be("br");
+        HttpHelper.NormalizeNegotiationHeader(header, ["gzip", "br", "application/json", "application/xml", "en", "sl"])
+            .Should().Be(expected);
     }
 
     [Fact]
-    public void NormalizeAcceptEncoding_WhenNoMatch_ClearsHeader()
+    public void NormalizeNegotiationHeader_PreservesMultipleHeaderValues()
     {
-        var http = new DefaultHttpContext();
-        http.Request.Headers.AcceptEncoding = "compress, identity";
-
-        HttpHelper.NormalizeAcceptEncoding(http, ["br", "gzip"]);
-
-        http.Request.Headers.AcceptEncoding.ToString().Should().BeEmpty();
+        StringValues values = new(["application/json;q=0", "*/*;q=1"]);
+        HttpHelper.NormalizeNegotiationHeader(values, ["application/json", "application/xml"])
+            .Should().Be(values.ToString());
     }
 
     [Fact]
-    public void NormalizeAcceptEncoding_WhenHeaderMissing_DoesNothing()
+    public void NormalizeNegotiationHeader_CommonCompositeHeader_ReusesString()
     {
-        var http = new DefaultHttpContext();
-
-        HttpHelper.NormalizeAcceptEncoding(http, ["br", "gzip"]);
-
-        http.Request.Headers.AcceptEncoding.ToString().Should().BeEmpty();
-    }
-
-    [Fact]
-    public void NormalizeAcceptEncoding_IsCaseInsensitive()
-    {
-        var http = new DefaultHttpContext();
-        http.Request.Headers.AcceptEncoding = "GZIP, DEFLATE";
-
-        HttpHelper.NormalizeAcceptEncoding(http, ["gzip"]);
-
-        http.Request.Headers.AcceptEncoding.ToString().Should().Be("gzip");
-    }
-
-    [Fact]
-    public void NormalizeAccept_JsonSeq_DoesNotMatchJson()
-    {
-        var http = new DefaultHttpContext();
-        http.Request.Headers.Accept = "application/json-seq";
-
-        HttpHelper.NormalizeAccept(http, ["application/json", "application/xml"]);
-
-        http.Request.Headers.Accept.ToString().Should().BeEmpty();
-    }
-
-    [Fact]
-    public void NormalizeAccept_IgnoresQParameter()
-    {
-        var http = new DefaultHttpContext();
-        http.Request.Headers.Accept = "text/html, application/json;q=0.9";
-
-        HttpHelper.NormalizeAccept(http, ["application/xml", "application/json"]);
-
-        http.Request.Headers.Accept.ToString().Should().Be("application/json");
-    }
-
-    [Fact]
-    public void NormalizeAcceptLanguage_EnMatchesEnUs()
-    {
-        var http = new DefaultHttpContext();
-        http.Request.Headers.AcceptLanguage = "en-US, sl;q=0.8";
-
-        HttpHelper.NormalizeAcceptLanguage(http, ["en", "sl"]);
-
-        http.Request.Headers.AcceptLanguage.ToString().Should().Be("en");
-    }
-
-    [Fact]
-    public void NormalizeAcceptLanguage_DoesNotMatchUnrelatedPrefix()
-    {
-        var http = new DefaultHttpContext();
-        http.Request.Headers.AcceptLanguage = "ena";
-
-        HttpHelper.NormalizeAcceptLanguage(http, ["en"]);
-
-        http.Request.Headers.AcceptLanguage.ToString().Should().BeEmpty();
+        string header = "br;q=0,gzip;q=1,*;q=0.5";
+        HttpHelper.NormalizeNegotiationHeader(header, ["br", "gzip"]).Should().BeSameAs(header);
     }
 }

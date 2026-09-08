@@ -450,7 +450,7 @@ public class DefaultDomainKeyGeneratorTests
     }
 
     [Fact]
-    public void Generate_AcceptNormalization_SamePreferMatch_ProducesSameKey()
+    public void Generate_AcceptNormalization_DifferentNegotiation_ProducesDifferentKeys()
     {
         var cfg = new DomainHttpCacheOptions
         {
@@ -464,7 +464,7 @@ public class DefaultDomainKeyGeneratorTests
         string key1 = _sut.Generate(cfg, CreateHttpContext(accept: "text/html, application/json;q=0.9"));
         string key2 = _sut.Generate(cfg, CreateHttpContext(accept: "application/json"));
 
-        key1.Should().Be(key2);
+        key1.Should().NotBe(key2);
     }
 
     [Fact]
@@ -481,6 +481,43 @@ public class DefaultDomainKeyGeneratorTests
         urlKey.Should().NotContain(":e:");
         http.Features.Get<ICacheOrchestratorFeature>()!.EntityKind.Should().Be("items");
         http.Features.Get<ICacheOrchestratorFeature>()!.ResourceId.Should().Be("42");
+    }
+
+    [Fact]
+    public void Generate_UrlShape_DifferentHttpMethods_ProduceDifferentKeys()
+    {
+        DomainHttpCacheOptions cfg = CreateConfig();
+        DefaultHttpContext get = CreateHttpContext(method: "GET");
+        DefaultHttpContext post = CreateHttpContext(method: "POST");
+
+        string getKey = _sut.Generate(cfg, get);
+        string postKey = _sut.Generate(cfg, post);
+
+        getKey.Should().NotBe(postKey);
+        getKey.Should().Contain(":u:");
+        postKey.Should().Contain(":u:");
+    }
+
+    [Fact]
+    public void Generate_UrlShape_MethodCasing_DoesNotChangeKey()
+    {
+        DomainHttpCacheOptions cfg = CreateConfig();
+        DefaultHttpContext upper = CreateHttpContext(method: "GET");
+        DefaultHttpContext lower = CreateHttpContext(method: "get");
+
+        _sut.Generate(cfg, upper).Should().Be(_sut.Generate(cfg, lower));
+    }
+
+    [Fact]
+    public void Generate_EntityShape_IgnoresHttpMethod()
+    {
+        DomainHttpCacheOptions cfg = CreateConfig(domain: "products");
+        DefaultHttpContext get = CreateHttpContext(method: "GET");
+        get.Features.Set<ICacheOrchestratorFeature>(new CacheOrchestratorFeature { EntityKind = "items", ResourceId = "42" });
+        DefaultHttpContext post = CreateHttpContext(method: "POST");
+        post.Features.Set<ICacheOrchestratorFeature>(new CacheOrchestratorFeature { EntityKind = "items", ResourceId = "42" });
+
+        _sut.Generate(cfg, get).Should().Be(_sut.Generate(cfg, post));
     }
 
     [Fact]
@@ -582,11 +619,12 @@ public class DefaultDomainKeyGeneratorTests
         string? acceptEncoding = null,
         string? accept = null,
         string scheme = "https",
-        string host = "localhost")
+        string host = "localhost",
+        string method = "GET")
     {
         var context = new DefaultHttpContext();
         context.Request.Path = path;
-        context.Request.Method = "GET";
+        context.Request.Method = method;
         context.Request.Scheme = scheme;
         context.Request.Host = new HostString(host);
 

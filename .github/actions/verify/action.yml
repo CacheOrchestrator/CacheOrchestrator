@@ -1,0 +1,49 @@
+name: Verify release candidate
+description: Run the same package, test and consumer gates on pull requests and releases.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-dotnet@v5
+      with:
+        global-json-file: global.json
+        dotnet-version: 8.0.4xx
+    - name: Build
+      shell: pwsh
+      run: ./eng/verify-release.ps1 -Phase Build
+    - name: Verify Docker
+      shell: bash
+      run: docker info
+    - name: Unit and integration tests (all declared frameworks)
+      shell: pwsh
+      run: ./eng/verify-release.ps1 -Phase Tests
+    - name: Pack every library and validate assets
+      shell: pwsh
+      run: ./eng/verify-release.ps1 -Phase Pack
+    - name: Test actual NuGet consumers and analyzer
+      shell: pwsh
+      run: ./eng/verify-release.ps1 -Phase Consumers
+    - name: Minimal sample smoke
+      shell: bash
+      run: bash samples/CacheOrchestrator.Minimal/smoke.sh
+    - name: Documentation links and JSON
+      shell: pwsh
+      run: ./eng/verify-docs.ps1
+    - name: Admin Console image
+      shell: bash
+      run: docker build -f src/CacheOrchestrator.AdminConsole/Dockerfile --build-arg VERSION="$(cat .artifacts/release/package-version.txt)" -t cacheorchestrator-admin-console:verify .
+    - name: Admin Console behind an authenticated proxy
+      shell: pwsh
+      run: ./eng/smoke-admin.ps1
+    - name: Upload logs, test results and coverage
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: release-validation
+        retention-days: 14
+        path: |
+          .artifacts/release/*.log
+          .artifacts/release/tests/**
+          .artifacts/release/consumer-*/*.log
+          .artifacts/release/admin/**
+          samples/CacheOrchestrator.Minimal/smoke.run.log
+        if-no-files-found: warn

@@ -55,6 +55,9 @@ public sealed class VarnishEdgeDockerTests(VarnishFixture varnish)
         builder.Services.AddCacheOrchestratorEdge(
             builder.Configuration,
             edge => edge.AddVarnish());
+        var purge = new TaskCompletionSource<HttpStatusCode>(TaskCreationOptions.RunContinuationsAsynchronously);
+        builder.Services.AddHttpClient("CacheOrchestrator.Edge.Varnish")
+            .AddHttpMessageHandler(() => new PurgeCompletionHandler(purge));
         var calls = new OriginCounter();
         builder.Services.AddSingleton(calls);
 
@@ -92,10 +95,11 @@ public sealed class VarnishEdgeDockerTests(VarnishFixture varnish)
             "catalog",
             new AdminVersionRequest { Version = "v2" },
             TestContext.Current.CancellationToken);
-        using HttpResponseMessage versionPurged = await WaitForMissAsync(
-            client,
-            "/ccs-flow",
-            TimeSpan.FromMilliseconds(1800));
+        // Observe the real provider request, not a scheduling deadline shorter than the TTL.
+        (await purge.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken))
+            .Should().Be(HttpStatusCode.OK);
+        using HttpResponseMessage versionPurged = await client.GetAsync("/ccs-flow", TestContext.Current.CancellationToken);
+        versionPurged.Headers.GetValues("Cache-Status").Should().ContainSingle("Varnish; fwd=uri-miss");
         GetOriginEdgeTtl(versionPurged).Should().Be(2);
         versionPurged.Headers.GetValues("X-CacheOrchestrator").Single().Should().Contain("phase=hold");
         (await versionPurged.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).Should().Be("4");
@@ -204,7 +208,7 @@ public sealed class VarnishEdgeDockerTests(VarnishFixture varnish)
         EdgeInvalidationResult invalidation = await provider.InvalidateAsync(
             new EdgeInvalidationRequest
             {
-                InstanceName = "edge",
+                Target = provider.CaptureTarget("edge", builder.Configuration.GetSection("Cache:EdgeInstances:edge")),
                 Tags = ["coe1-integration-item"]
             },
             TestContext.Current.CancellationToken);
@@ -236,6 +240,17 @@ public sealed class VarnishEdgeDockerTests(VarnishFixture varnish)
             if (DateTimeOffset.UtcNow >= timeout)
                 throw new TimeoutException("Varnish did not return an origin miss within the expected interval.");
             await Task.Delay(50, TestContext.Current.CancellationToken);
+        }
+    }
+
+    private sealed class PurgeCompletionHandler(TaskCompletionSource<HttpStatusCode> completion) : DelegatingHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            HttpResponseMessage response = await base.SendAsync(request, cancellationToken);
+            if (request.Method.Method == "PURGE")
+                completion.TrySetResult(response.StatusCode);
+            return response;
         }
     }
 

@@ -147,6 +147,54 @@ public class CacheIdentityHttpTests
     }
 
     [Fact]
+    public async Task ContentHashPost_OversizedChunkedBody_BypassesCache_ButEndpointReadsFullBody()
+    {
+        string domain = "id-" + Guid.NewGuid().ToString("N");
+        string payload = new string('x', 20);
+
+        await using WebApplication app = await CreateAppAsync(domain, map =>
+        {
+            map.MapPost("/graphql", async (HttpContext http) =>
+            {
+                string body = await new StreamReader(http.Request.Body).ReadToEndAsync(http.RequestAborted);
+                return Results.Text(body);
+            })
+            .CacheOutputWithDomain(domain)
+            .WithContentHashCacheIdentity(["POST"], maxBodyBytes: 8);
+        });
+
+        HttpClient client = app.GetTestClient();
+        using ChunkedStringContent content = new(payload);
+        HttpResponseMessage response = await client.PostAsync("/graphql", content, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        body.Should().Be(payload);
+        response.Headers.TryGetValues("X-CacheOrchestrator", out IEnumerable<string>? x).Should().BeTrue();
+        string.Join(',', x!).Should().NotContain("oc=hit");
+    }
+
+    private sealed class ChunkedStringContent : HttpContent
+    {
+        private readonly byte[] _payload;
+
+        public ChunkedStringContent(string payload)
+        {
+            _payload = Encoding.UTF8.GetBytes(payload);
+            Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+        }
+
+        protected override Task SerializeToStreamAsync(Stream stream, System.Net.TransportContext? context) =>
+            stream.WriteAsync(_payload).AsTask();
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
+        }
+    }
+
+    [Fact]
     public async Task UnknownContractName_FailsWhenResolved()
     {
         string domain = "id-" + Guid.NewGuid().ToString("N");

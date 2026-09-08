@@ -3,7 +3,6 @@
 		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<LangVersion>latest</LangVersion>
 		<PackageId>CacheOrchestrator.HybridCache</PackageId>
 		<Description>Microsoft HybridCache data-cache provider for CacheOrchestrator.Core (subset of Fusion capabilities).</Description>
 		<PackageTags>cache;caching;hybridcache;cacheorchestrator</PackageTags>

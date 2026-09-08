@@ -3,7 +3,6 @@
 		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<LangVersion>latest</LangVersion>
 		<PackageId>CacheOrchestrator.FusionCache</PackageId>
 		<Description>FusionCache data-cache provider for CacheOrchestrator.Core.</Description>
 		<PackageTags>cache;caching;fusioncache;cacheorchestrator</PackageTags>

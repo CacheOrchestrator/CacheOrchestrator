@@ -4,10 +4,12 @@
 # Content root is writable so the sample settings UI can save appsettings.json.
 # compose down / recreate restores image + lab Production overlays.
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.400 AS build
 WORKDIR /src
 
 COPY Directory.Build.props ./
+COPY global.json ./
+COPY eng/ReleaseProjects.props eng/ReleaseProjects.props
 COPY PACKAGE_RELEASE_NOTES.md ./
 COPY docs/assets/logo-small.png docs/assets/logo-small.png
 COPY eng/PublicApi/ eng/PublicApi/

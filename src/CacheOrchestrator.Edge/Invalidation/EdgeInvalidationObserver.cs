@@ -42,8 +42,8 @@ internal sealed class EdgeInvalidationObserver : ICacheInvalidationObserver
         if (result.IsSkipped || context.Origin == CacheInvalidationOrigin.RemoteCluster)
             return;
 
-        var groups = new Dictionary<string, (ResolvedEdgeInstance Instance, HashSet<string> Tags)>(
-            StringComparer.OrdinalIgnoreCase);
+        var groups = new Dictionary<EdgeInvalidationTarget, HashSet<string>>();
+        var captured = new Dictionary<string, (ResolvedEdgeInstance Instance, EdgeInvalidationTarget Target)>(StringComparer.OrdinalIgnoreCase);
         foreach (string canonicalTag in context.Tags)
         {
             string? domain = TryGetDomain(canonicalTag);
@@ -53,24 +53,28 @@ internal sealed class EdgeInvalidationObserver : ICacheInvalidationObserver
             if (!domainOptions.Enabled)
                 continue;
 
-            ResolvedEdgeInstance instance = _instances.Resolve(domainOptions.InstanceName);
-            if (!groups.TryGetValue(
-                    instance.Name,
-                    out (ResolvedEdgeInstance Instance, HashSet<string> Tags) group))
+            if (!captured.TryGetValue(domainOptions.InstanceName, out (ResolvedEdgeInstance Instance, EdgeInvalidationTarget Target) snapshot))
             {
-                group = (instance, new HashSet<string>(StringComparer.Ordinal));
-                groups.Add(instance.Name, group);
+                ResolvedEdgeInstance resolved = _instances.Resolve(domainOptions.InstanceName);
+                snapshot = (resolved, _instances.CaptureTarget(resolved.Name, resolved.InvalidationProvider.Name));
+                captured.Add(domainOptions.InstanceName, snapshot);
             }
-            group.Tags.Add(_projector.Project(instance.TagNamespace, canonicalTag));
+            (ResolvedEdgeInstance instance, EdgeInvalidationTarget target) = snapshot;
+            if (!groups.TryGetValue(target, out HashSet<string>? tags))
+            {
+                tags = new(StringComparer.Ordinal);
+                groups.Add(target, tags);
+            }
+            tags.Add(_projector.Project(instance.TagNamespace, canonicalTag));
         }
 
-        foreach ((ResolvedEdgeInstance instance, HashSet<string> tags) in groups.Values)
+        foreach ((EdgeInvalidationTarget target, HashSet<string> tags) in groups)
         {
             string[] values = [.. tags];
             await _queue.EnqueueAsync(
-                new EdgeInvalidationJob(instance.Name, instance.InvalidationProvider.Name, values),
+                new EdgeInvalidationJob(target, values),
                 cancellationToken).ConfigureAwait(false);
-            EdgeMetrics.RecordQueued(instance.Name, instance.InvalidationProvider.Name, values.Length);
+            EdgeMetrics.RecordQueued(target.InstanceName, target.ProviderName, values.Length);
         }
     }
 

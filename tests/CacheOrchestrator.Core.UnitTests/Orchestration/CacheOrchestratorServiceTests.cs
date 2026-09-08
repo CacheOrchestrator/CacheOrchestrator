@@ -231,7 +231,7 @@ public class CacheOrchestratorServiceTests
     }
 
     [Fact]
-    public async Task GetOrCreateWithFootprintAsync_OnMiss_CallsSetAsyncWithFinalTags()
+    public async Task GetOrCreateWithFootprintAsync_OnMiss_SelectsFinalTagsBeforePublication()
     {
         DomainCacheOptions opts = CreateOptions(enabled: true, domain: "store", versionHex: "v1");
         _domainOptions.GetOrCreateDomainOptions("store").Returns(opts);
@@ -239,31 +239,19 @@ public class CacheOrchestratorServiceTests
         EntityRef primary = new("items", "42");
         EntityFootprint early = new(primary);
         EntityFootprint expanded = early.WithDependsOn([new EntityRef("categories", "9")]);
+        IReadOnlyList<string>? finalTags = null;
 
         _dataCache
-            .GetOrCreateAsync(
+            .GetOrCreateWithTagsAsync(
                 Arg.Any<DataCacheProviderRequest>(),
                 Arg.Any<Func<CancellationToken, ValueTask<FootprintCacheBox<string?>>>>(),
+                Arg.Any<Func<FootprintCacheBox<string?>, IReadOnlyList<string>>>(),
                 Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
                 Func<CancellationToken, ValueTask<FootprintCacheBox<string?>>> factory =
                     callInfo.ArgAt<Func<CancellationToken, ValueTask<FootprintCacheBox<string?>>>>(1);
-                return Materialize(factory, CancellationToken.None);
-            });
-
-        DataCacheProviderRequest? setRequest = null;
-        FootprintCacheBox<string?>? setValue = null;
-        _dataCache
-            .SetAsync(
-                Arg.Any<DataCacheProviderRequest>(),
-                Arg.Any<FootprintCacheBox<string?>>(),
-                Arg.Any<CancellationToken>())
-            .Returns(callInfo =>
-            {
-                setRequest = callInfo.ArgAt<DataCacheProviderRequest>(0);
-                setValue = callInfo.ArgAt<FootprintCacheBox<string?>>(1);
-                return ValueTask.CompletedTask;
+                return MaterializeWithTags(factory, callInfo.ArgAt<Func<FootprintCacheBox<string?>, IReadOnlyList<string>>>(2), tags => finalTags = tags);
             });
 
         FootprintCacheBox<string?> box = await _sut.GetOrCreateWithFootprintAsync<string>(
@@ -284,11 +272,12 @@ public class CacheOrchestratorServiceTests
         box.Value.Should().Be("payload");
         box.Footprint.DependsOn.Should().ContainSingle(r => r.EntityKind == "categories" && r.ResourceId == "9");
 
-        setRequest.Should().NotBeNull();
-        setValue.Should().NotBeNull();
-        setRequest.Tags.Should().Contain("entity:store:items:42");
-        setRequest.Tags.Should().Contain("entity:store:categories:9");
-        setRequest.Tags.Should().Contain("entitykind:store:categories");
+        finalTags.Should().NotBeNull();
+        finalTags!.Should().Contain("entity:store:items:42");
+        finalTags!.Should().Contain("entity:store:categories:9");
+        finalTags!.Should().Contain("entitykind:store:categories");
+        await _dataCache.DidNotReceive().SetAsync(
+            Arg.Any<DataCacheProviderRequest>(), Arg.Any<FootprintCacheBox<string?>>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -306,9 +295,10 @@ public class CacheOrchestratorServiceTests
         };
 
         _dataCache
-            .GetOrCreateAsync(
+            .GetOrCreateWithTagsAsync(
                 Arg.Any<DataCacheProviderRequest>(),
                 Arg.Any<Func<CancellationToken, ValueTask<FootprintCacheBox<string?>>>>(),
+                Arg.Any<Func<FootprintCacheBox<string?>, IReadOnlyList<string>>>(),
                 Arg.Any<CancellationToken>())
             .Returns(Cached(cached));
 
@@ -334,9 +324,10 @@ public class CacheOrchestratorServiceTests
 
         EntityFootprint footprint = new(new EntityRef("items", "1"));
         _dataCache
-            .GetOrCreateAsync(
+            .GetOrCreateWithTagsAsync(
                 Arg.Any<DataCacheProviderRequest>(),
                 Arg.Any<Func<CancellationToken, ValueTask<FootprintCacheBox<string?>>>>(),
+                Arg.Any<Func<FootprintCacheBox<string?>, IReadOnlyList<string>>>(),
                 Arg.Any<CancellationToken>())
             .Returns(callInfo => Materialize(
                 callInfo.ArgAt<Func<CancellationToken, ValueTask<FootprintCacheBox<string?>>>>(1),
@@ -397,9 +388,10 @@ public class CacheOrchestratorServiceTests
         Task<FootprintCacheBox<string?>>? backgroundFactory = null;
 
         _dataCache
-            .GetOrCreateAsync(
+            .GetOrCreateWithTagsAsync(
                 Arg.Any<DataCacheProviderRequest>(),
                 Arg.Any<Func<CancellationToken, ValueTask<FootprintCacheBox<string?>>>>(),
+                Arg.Any<Func<FootprintCacheBox<string?>, IReadOnlyList<string>>>(),
                 Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
@@ -438,9 +430,10 @@ public class CacheOrchestratorServiceTests
 
         DataCacheProviderRequest? getRequest = null;
         _dataCache
-            .GetOrCreateAsync(
+            .GetOrCreateWithTagsAsync(
                 Arg.Any<DataCacheProviderRequest>(),
                 Arg.Any<Func<CancellationToken, ValueTask<FootprintCacheBox<string?>>>>(),
+                Arg.Any<Func<FootprintCacheBox<string?>, IReadOnlyList<string>>>(),
                 Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
@@ -476,28 +469,18 @@ public class CacheOrchestratorServiceTests
         DomainCacheOptions opts = CreateOptions(enabled: true, domain: "products", versionHex: "v1");
         _domainOptions.GetOrCreateDomainOptions("products").Returns(opts);
 
-        DataCacheProviderRequest? setRequest = null;
+        IReadOnlyList<string>? finalTags = null;
         _dataCache
-            .GetOrCreateAsync(
+            .GetOrCreateWithTagsAsync(
                 Arg.Any<DataCacheProviderRequest>(),
                 Arg.Any<Func<CancellationToken, ValueTask<FootprintCacheBox<string?>>>>(),
+                Arg.Any<Func<FootprintCacheBox<string?>, IReadOnlyList<string>>>(),
                 Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
                 Func<CancellationToken, ValueTask<FootprintCacheBox<string?>>> factory =
                     callInfo.ArgAt<Func<CancellationToken, ValueTask<FootprintCacheBox<string?>>>>(1);
-                return Materialize(factory, CancellationToken.None);
-            });
-
-        _dataCache
-            .SetAsync(
-                Arg.Any<DataCacheProviderRequest>(),
-                Arg.Any<FootprintCacheBox<string?>>(),
-                Arg.Any<CancellationToken>())
-            .Returns(callInfo =>
-            {
-                setRequest = callInfo.ArgAt<DataCacheProviderRequest>(0);
-                return ValueTask.CompletedTask;
+                return MaterializeWithTags(factory, callInfo.ArgAt<Func<FootprintCacheBox<string?>, IReadOnlyList<string>>>(2), tags => finalTags = tags);
             });
 
         string? value = await _sut.GetOrCreateEntityAsync(
@@ -509,7 +492,7 @@ public class CacheOrchestratorServiceTests
             TestContext.Current.CancellationToken);
 
         value.Should().Be("p1");
-        setRequest!.Tags.Should().Contain("entity:products:categories:cat-1");
+        finalTags!.Should().Contain("entity:products:categories:cat-1");
     }
 
     [Fact]
@@ -518,28 +501,18 @@ public class CacheOrchestratorServiceTests
         DomainCacheOptions opts = CreateOptions(enabled: true, domain: "products", versionHex: "v1");
         _domainOptions.GetOrCreateDomainOptions("products").Returns(opts);
 
-        DataCacheProviderRequest? setRequest = null;
+        IReadOnlyList<string>? finalTags = null;
         _dataCache
-            .GetOrCreateAsync(
+            .GetOrCreateWithTagsAsync(
                 Arg.Any<DataCacheProviderRequest>(),
                 Arg.Any<Func<CancellationToken, ValueTask<FootprintCacheBox<IReadOnlyList<string>?>>>>(),
+                Arg.Any<Func<FootprintCacheBox<IReadOnlyList<string>?>, IReadOnlyList<string>>>(),
                 Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
                 Func<CancellationToken, ValueTask<FootprintCacheBox<IReadOnlyList<string>?>>> factory =
                     callInfo.ArgAt<Func<CancellationToken, ValueTask<FootprintCacheBox<IReadOnlyList<string>?>>>>(1);
-                return Materialize(factory, CancellationToken.None);
-            });
-
-        _dataCache
-            .SetAsync(
-                Arg.Any<DataCacheProviderRequest>(),
-                Arg.Any<FootprintCacheBox<IReadOnlyList<string>?>>(),
-                Arg.Any<CancellationToken>())
-            .Returns(callInfo =>
-            {
-                setRequest = callInfo.ArgAt<DataCacheProviderRequest>(0);
-                return ValueTask.CompletedTask;
+                return MaterializeWithTags(factory, callInfo.ArgAt<Func<FootprintCacheBox<IReadOnlyList<string>?>, IReadOnlyList<string>>>(2), tags => finalTags = tags);
             });
 
         IReadOnlyList<string> list = await _sut.GetOrCreateEntitySetAsync(
@@ -550,9 +523,9 @@ public class CacheOrchestratorServiceTests
             TestContext.Current.CancellationToken);
 
         list.Should().Equal("a", "b");
-        setRequest!.Tags.Should().Contain("entity:products:products:a");
-        setRequest.Tags.Should().Contain("entity:products:products:b");
-        setRequest.Tags.Should().Contain("entitykind:products:products");
+        finalTags!.Should().Contain("entity:products:products:a");
+        finalTags!.Should().Contain("entity:products:products:b");
+        finalTags!.Should().Contain("entitykind:products:products");
     }
 
     [Fact]
@@ -570,10 +543,21 @@ public class CacheOrchestratorServiceTests
 
         value.Should().Be("fresh");
         await _dataCache.DidNotReceive()
-            .GetOrCreateAsync(
+            .GetOrCreateWithTagsAsync(
                 Arg.Any<DataCacheProviderRequest>(),
                 Arg.Any<Func<CancellationToken, ValueTask<FootprintCacheBox<string?>>>>(),
+                Arg.Any<Func<FootprintCacheBox<string?>, IReadOnlyList<string>>>(),
                 Arg.Any<CancellationToken>());
+    }
+
+    private static async ValueTask<DataCacheProviderResult<T>> MaterializeWithTags<T>(
+        Func<CancellationToken, ValueTask<T>> factory,
+        Func<T, IReadOnlyList<string>> tagSelector,
+        Action<IReadOnlyList<string>> capture)
+    {
+        T value = await factory(CancellationToken.None);
+        capture(tagSelector(value));
+        return new(value, DataCacheProviderOutcome.Materialized);
     }
 
     private static ValueTask<DataCacheProviderResult<T>> Cached<T>(T value) =>

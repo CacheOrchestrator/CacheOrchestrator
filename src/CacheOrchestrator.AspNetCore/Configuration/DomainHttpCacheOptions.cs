@@ -7,10 +7,13 @@ namespace CacheOrchestrator.Configuration;
 /// </summary>
 /// <remarks>
 /// HTTP-free domain identity and Data Cache policy are available through <see cref="CoreOptions"/>.
+/// Collection setters copy their input into read-only storage once; callers cannot mutate shared policy.
 /// This snapshot owns Output Cache, Client Cache, authentication, vary, ETag, and HTTP Data Cache key policy.
 /// </remarks>
 public sealed class DomainHttpCacheOptions
 {
+    private static readonly SnapshotList<int> DefaultStatusCodes = new([200]);
+    private static readonly SnapshotList<string> DefaultEncodings = new(["br", "gzip"]);
     /// <summary>HTTP-free domain snapshot shared with Core orchestration and Data Cache providers.</summary>
     public DomainCacheOptions CoreOptions { get; init; } = new();
 
@@ -51,7 +54,13 @@ public sealed class DomainHttpCacheOptions
     public bool AuthVaryIncludeAuthorizationHash { get; init; } = true;
 
     /// <summary>Claim types included in authenticated vary material.</summary>
-    public string[]? VaryByAuthClaims { get; init; }
+    public IReadOnlyList<string>? VaryByAuthClaims
+    {
+        get => _varyByAuthClaims;
+        init => _varyByAuthClaims = value is null ? null : new(value);
+    }
+    private readonly SnapshotList<string>? _varyByAuthClaims;
+    internal string[]? VaryByAuthClaimsArray => _varyByAuthClaims?.Values;
 
     /// <summary>Whether HTTP Data Cache calls respect the same authentication bypass as Output Cache.</summary>
     public bool DataCacheRespectAuthBypass { get; init; } = true;
@@ -62,26 +71,65 @@ public sealed class DomainHttpCacheOptions
     /// <summary>Whether HTTP cache identity varies by Accept.</summary>
     public bool VaryByAccept { get; init; }
 
-    /// <summary>Preferred Accept values used for normalization.</summary>
-    public string[]? AcceptNormalizationList { get; init; }
+    /// <summary>
+    /// Canonical spellings for single, parameter-free Accept tokens. Composite headers retain
+    /// their complete negotiation material. <see langword="null"/> keeps the raw header.
+    /// </summary>
+    public IReadOnlyList<string>? AcceptNormalizationList
+    {
+        get => _acceptNormalizationList;
+        init => _acceptNormalizationList = value is null ? null : new(value);
+    }
+    private readonly SnapshotList<string>? _acceptNormalizationList;
+    internal string[]? AcceptNormalizationListArray => _acceptNormalizationList?.Values;
 
     /// <summary>Whether HTTP cache identity varies by Accept-Language.</summary>
     public bool VaryByAcceptLanguage { get; init; }
 
-    /// <summary>Preferred Accept-Language values used for normalization.</summary>
-    public string[]? AcceptLanguageNormalizationList { get; init; }
+    /// <summary>Canonical spellings for single, parameter-free Accept-Language tokens; composite headers are retained.</summary>
+    public IReadOnlyList<string>? AcceptLanguageNormalizationList
+    {
+        get => _acceptLanguageNormalizationList;
+        init => _acceptLanguageNormalizationList = value is null ? null : new(value);
+    }
+    private readonly SnapshotList<string>? _acceptLanguageNormalizationList;
+    internal string[]? AcceptLanguageNormalizationListArray => _acceptLanguageNormalizationList?.Values;
 
     /// <summary>Additional request headers included in HTTP cache identity.</summary>
-    public string[]? VaryByHeaders { get; init; }
+    public IReadOnlyList<string>? VaryByHeaders
+    {
+        get => _varyByHeaders;
+        init => _varyByHeaders = value is null ? null : new(value);
+    }
+    private readonly SnapshotList<string>? _varyByHeaders;
+    internal string[]? VaryByHeadersArray => _varyByHeaders?.Values;
 
     /// <summary>Query key allowlist included in HTTP cache identity.</summary>
-    public string[]? VaryByQueryKeys { get; init; }
+    public IReadOnlyList<string>? VaryByQueryKeys
+    {
+        get => _varyByQueryKeys;
+        init => _varyByQueryKeys = value is null ? null : new(value);
+    }
+    private readonly SnapshotList<string>? _varyByQueryKeys;
+    internal string[]? VaryByQueryKeysArray => _varyByQueryKeys?.Values;
 
     /// <summary>Additional query keys ignored by HTTP cache identity.</summary>
-    public string[]? IgnoreQueryKeys { get; init; }
+    public IReadOnlyList<string>? IgnoreQueryKeys
+    {
+        get => _ignoreQueryKeys;
+        init => _ignoreQueryKeys = value is null ? null : new(value);
+    }
+    private readonly SnapshotList<string>? _ignoreQueryKeys;
+    internal string[]? IgnoreQueryKeysArray => _ignoreQueryKeys?.Values;
 
     /// <summary>Cookie names included in HTTP cache identity.</summary>
-    public string[]? VaryByCookies { get; init; }
+    public IReadOnlyList<string>? VaryByCookies
+    {
+        get => _varyByCookies;
+        init => _varyByCookies = value is null ? null : new(value);
+    }
+    private readonly SnapshotList<string>? _varyByCookies;
+    internal string[]? VaryByCookiesArray => _varyByCookies?.Values;
 
     /// <summary>Whether response Vary headers are emitted for non-secret varied headers.</summary>
     public bool EmitResponseVary { get; init; } = true;
@@ -90,13 +138,35 @@ public sealed class DomainHttpCacheOptions
     public ETagMode ETagMode { get; init; } = ETagMode.Version;
 
     /// <summary>Precomputed Version ETag.</summary>
-    public StringValues ETag { get; init; }
+    public StringValues ETag
+    {
+        get => _eTag;
+        init => _eTag = value.Count switch
+        {
+            0 => null,
+            1 => value[0],
+            _ => throw new ArgumentException("A domain ETag must contain a single value.", nameof(value))
+        };
+    }
+    private readonly string? _eTag;
 
     /// <summary>HTTP status codes that may be stored in Output Cache.</summary>
-    public int[] CacheableStatusCodes { get; init; } = [200];
+    public IReadOnlyList<int> CacheableStatusCodes
+    {
+        get => _cacheableStatusCodes;
+        init => _cacheableStatusCodes = new(value ?? throw new ArgumentNullException(nameof(value)));
+    }
+    private readonly SnapshotList<int> _cacheableStatusCodes = DefaultStatusCodes;
+    internal int[] CacheableStatusCodesArray => _cacheableStatusCodes.Values;
 
-    /// <summary>Preferred Accept-Encoding values used for normalization.</summary>
-    public string[]? EncodingNormalizationList { get; init; } = ["br", "gzip"];
+    /// <summary>Canonical spellings for single, parameter-free Accept-Encoding tokens; composite headers are retained.</summary>
+    public IReadOnlyList<string>? EncodingNormalizationList
+    {
+        get => _encodingNormalizationList;
+        init => _encodingNormalizationList = value is null ? null : new(value);
+    }
+    private readonly SnapshotList<string>? _encodingNormalizationList = DefaultEncodings;
+    internal string[]? EncodingNormalizationListArray => _encodingNormalizationList?.Values;
 
     /// <summary>Client Cache response cacheability.</summary>
     public ClientCacheability ClientCacheability { get; init; }

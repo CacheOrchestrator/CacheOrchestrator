@@ -5,7 +5,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using System.Net;
 using System.Text;
 
@@ -80,7 +79,7 @@ public class CloudflareEdgeProviderTests
 
         EdgeInvalidationResult result = await sut.InvalidateAsync(new EdgeInvalidationRequest
         {
-            InstanceName = "edge",
+            Target = sut.CaptureTarget("edge", TargetConfiguration()),
             Tags = ["coe1-a", "coe1-b"]
         }, TestContext.Current.CancellationToken);
 
@@ -100,7 +99,7 @@ public class CloudflareEdgeProviderTests
 
         EdgeInvalidationResult result = await sut.InvalidateAsync(new EdgeInvalidationRequest
         {
-            InstanceName = "edge",
+            Target = sut.CaptureTarget("edge", TargetConfiguration()),
             Tags = ["coe1-a"]
         }, TestContext.Current.CancellationToken);
 
@@ -114,28 +113,11 @@ public class CloudflareEdgeProviderTests
         var client = new HttpClient(handler) { BaseAddress = new Uri("https://api.cloudflare.com/client/v4/") };
         IHttpClientFactory factory = Substitute.For<IHttpClientFactory>();
         factory.CreateClient(CloudflareEdgeProvider.HttpClientName).Returns(client);
-        var monitor = new TestOptionsMonitor(new CloudflareEdgeConfiguration
-        {
-            EdgeInstances = new Dictionary<string, CloudflareEdgeInstanceContainer>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["edge"] = new()
-                {
-                    Cloudflare = new CloudflareEdgeInstanceOptions { ZoneId = "zone-1", ApiToken = "token-1" }
-                }
-            }
-        });
-        return new CloudflareEdgeProvider(factory, monitor);
+        return new CloudflareEdgeProvider(factory);
     }
 
-    private sealed class TestOptionsMonitor(CloudflareEdgeConfiguration value)
-        : IOptionsMonitor<CloudflareEdgeConfiguration>
-    {
-        public CloudflareEdgeConfiguration CurrentValue => value;
-
-        public CloudflareEdgeConfiguration Get(string? name) => value;
-
-        public IDisposable? OnChange(Action<CloudflareEdgeConfiguration, string?> listener) => null;
-    }
+    private static IConfigurationSection TargetConfiguration() =>
+        new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["edge:Cloudflare:ZoneId"] = "zone-1", ["edge:Cloudflare:ApiToken"] = "token-1" }).Build().GetSection("edge");
 
     private sealed class RecordingHandler : HttpMessageHandler
     {

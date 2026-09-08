@@ -14,7 +14,10 @@ internal sealed class EdgeInvalidationWorker : BackgroundService
     private readonly EdgeProviderCatalog _providers;
     private readonly IOptionsMonitor<CacheOrchestratorEdgeOptions> _options;
     private readonly ILogger<EdgeInvalidationWorker> _logger;
-    private CancellationToken _shutdownToken;
+    private readonly CancellationTokenSource _abort = new();
+    private readonly CancellationToken _abortToken;
+    private int _disposed;
+    private readonly TaskCompletionSource _started = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public EdgeInvalidationWorker(
         EdgeInvalidationChannel channel,
@@ -30,101 +33,142 @@ internal sealed class EdgeInvalidationWorker : BackgroundService
         _providers = providers;
         _options = options;
         _logger = logger;
+        _abortToken = _abort.Token;
     }
 
-    public override Task StopAsync(CancellationToken cancellationToken)
+    public override async Task StartAsync(CancellationToken cancellationToken)
     {
-        _shutdownToken = cancellationToken;
+        await base.StartAsync(cancellationToken).ConfigureAwait(false);
+        // .NET 10 schedules ExecuteAsync on the pool. Ensure it has started before StopAsync
+        // can cancel that scheduled delegate and strand jobs admitted during startup.
+        Task completed = await Task.WhenAny(_started.Task, ExecuteTask!).WaitAsync(cancellationToken).ConfigureAwait(false);
+        await completed.ConfigureAwait(false);
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
         _channel.Channel.Writer.TryComplete();
-        return base.StopAsync(cancellationToken);
+        using CancellationTokenRegistration deadline = cancellationToken.Register(static state => ((CancellationTokenSource)state!).Cancel(), _abort);
+        try
+        {
+            await base.StopAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            // The host's wait callback can finish StopAsync before our cancellation callback
+            // runs. Propagate the deadline before disposing that registration in either order.
+            if (cancellationToken.IsCancellationRequested)
+                _abort.Cancel();
+        }
+    }
+
+    public override void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+        _abort.Cancel();
+        base.Dispose();
+        _abort.Dispose();
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        _started.TrySetResult();
         ChannelReader<EdgeInvalidationJob> reader = _channel.Channel.Reader;
         EdgeInvalidationJob? pending = null;
+        var groups = new Dictionary<EdgeInvalidationTarget, HashSet<string>>();
         try
         {
-            while (await reader.WaitToReadAsync(stoppingToken).ConfigureAwait(false))
+            try
             {
-                if (!reader.TryRead(out pending))
-                    continue;
-
-                int flushSeconds = _options.CurrentValue.EdgeQueue.FlushIntervalSeconds;
-                if (flushSeconds > 0)
-                    await Task.Delay(TimeSpan.FromSeconds(flushSeconds), stoppingToken).ConfigureAwait(false);
-
-                var groups = new Dictionary<string, (string ProviderName, HashSet<string> Tags)>(
-                    StringComparer.OrdinalIgnoreCase);
-                Add(pending, groups);
+                while (await reader.WaitToReadAsync(stoppingToken).ConfigureAwait(false))
+                {
+                    if (!reader.TryRead(out pending))
+                        continue;
+                    int flushSeconds = _options.CurrentValue.EdgeQueue.FlushIntervalSeconds;
+                    if (flushSeconds > 0)
+                        await Task.Delay(TimeSpan.FromSeconds(flushSeconds), stoppingToken).ConfigureAwait(false);
+                    Add(pending, groups);
+                    pending = null;
+                    DrainAvailable(reader, groups);
+                    // Normal shutdown interrupts coalescing, not provider I/O already in progress.
+                    // Only the host's shutdown deadline aborts the purge.
+                    await InvalidateGroupsAsync(groups, _abortToken).ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                if (pending is not null)
+                    Add(pending, groups);
                 pending = null;
-                while (reader.TryRead(out EdgeInvalidationJob? job))
-                    Add(job, groups);
-
-                await InvalidateGroupsAsync(groups, stoppingToken).ConfigureAwait(false);
+                DrainAvailable(reader, groups);
+                await InvalidateGroupsAsync(groups, _abortToken).ConfigureAwait(false);
             }
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (_abortToken.IsCancellationRequested)
         {
-            var groups = new Dictionary<string, (string ProviderName, HashSet<string> Tags)>(
-                StringComparer.OrdinalIgnoreCase);
             if (pending is not null)
                 Add(pending, groups);
-            while (reader.TryRead(out EdgeInvalidationJob? job))
-                Add(job, groups);
-
-            await InvalidateGroupsAsync(groups, _shutdownToken).ConfigureAwait(false);
+            DrainAvailable(reader, groups);
+            foreach ((EdgeInvalidationTarget target, HashSet<string> tags) in groups)
+            {
+                EdgeMetrics.RecordFailure(target.InstanceName, target.ProviderName, "shutdown-deadline");
+                _logger.LogWarning(
+                    "Edge shutdown deadline left {TagCount} undelivered tags for instance '{Instance}' provider={Provider}.",
+                    tags.Count, target.InstanceName, target.ProviderName);
+            }
         }
+    }
+
+    private static void DrainAvailable(ChannelReader<EdgeInvalidationJob> reader, Dictionary<EdgeInvalidationTarget, HashSet<string>> groups)
+    {
+        // Bound each normal coalescing pass so a continuous producer cannot starve provider I/O.
+        int count = reader.Count;
+        for (int i = 0; i < count && reader.TryRead(out EdgeInvalidationJob? job); i++)
+            Add(job, groups);
     }
 
     private async Task InvalidateGroupsAsync(
-        Dictionary<string, (string ProviderName, HashSet<string> Tags)> groups,
-        CancellationToken cancellationToken)
+        Dictionary<EdgeInvalidationTarget, HashSet<string>> groups, CancellationToken cancellationToken)
     {
-        foreach ((string instanceName, (string providerName, HashSet<string> tags)) in groups)
-            await InvalidateGroupAsync(instanceName, providerName, tags, cancellationToken).ConfigureAwait(false);
+        foreach ((EdgeInvalidationTarget target, HashSet<string> tags) in groups.ToArray())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            IEdgeInvalidationProvider provider = _providers.ResolveInvalidation(target.ProviderName);
+            int batchSize = provider.Capabilities.MaxInvalidationBatchSize;
+            string[] allTags = [.. tags];
+            for (int offset = 0; offset < allTags.Length; offset += batchSize)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                int count = Math.Min(batchSize, allTags.Length - offset);
+                string[] batch = new string[count];
+                Array.Copy(allTags, offset, batch, 0, count);
+                await InvalidateBatchAsync(provider, target, batch, cancellationToken).ConfigureAwait(false);
+                foreach (string tag in batch)
+                    tags.Remove(tag);
+            }
+            groups.Remove(target);
+        }
     }
 
-    private static void Add(
-        EdgeInvalidationJob job,
-        Dictionary<string, (string ProviderName, HashSet<string> Tags)> groups)
+    private static void Add(EdgeInvalidationJob job, Dictionary<EdgeInvalidationTarget, HashSet<string>> groups)
     {
-        if (!groups.TryGetValue(
-                job.InstanceName,
-                out (string ProviderName, HashSet<string> Tags) group))
+        if (!groups.TryGetValue(job.Target, out HashSet<string>? tags))
         {
-            group = (job.ProviderName, new HashSet<string>(StringComparer.Ordinal));
-            groups.Add(job.InstanceName, group);
+            tags = new(StringComparer.Ordinal);
+            groups.Add(job.Target, tags);
         }
-
         foreach (string tag in job.Tags)
-            group.Tags.Add(tag);
-    }
-
-    private async Task InvalidateGroupAsync(
-        string instanceName,
-        string providerName,
-        HashSet<string> tags,
-        CancellationToken cancellationToken)
-    {
-        IEdgeInvalidationProvider provider = _providers.ResolveInvalidation(providerName);
-        int batchSize = provider.Capabilities.MaxInvalidationBatchSize;
-        string[] allTags = [.. tags];
-        for (int offset = 0; offset < allTags.Length; offset += batchSize)
-        {
-            int count = Math.Min(batchSize, allTags.Length - offset);
-            string[] batch = new string[count];
-            Array.Copy(allTags, offset, batch, 0, count);
-            await InvalidateBatchAsync(provider, instanceName, batch, cancellationToken).ConfigureAwait(false);
-        }
+            tags.Add(tag);
     }
 
     private async Task InvalidateBatchAsync(
         IEdgeInvalidationProvider provider,
-        string instanceName,
+        EdgeInvalidationTarget target,
         IReadOnlyList<string> tags,
         CancellationToken cancellationToken)
     {
+        string instanceName = target.InstanceName;
         EdgeQueueOptions queueOptions = _options.CurrentValue.EdgeQueue;
         for (int attempt = 1; attempt <= queueOptions.MaxAttempts; attempt++)
         {
@@ -132,10 +176,10 @@ internal sealed class EdgeInvalidationWorker : BackgroundService
             try
             {
                 result = await provider.InvalidateAsync(
-                    new EdgeInvalidationRequest { InstanceName = instanceName, Tags = tags },
+                    new EdgeInvalidationRequest { Target = target, Tags = tags },
                     cancellationToken).ConfigureAwait(false);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 result = new EdgeInvalidationResult
                 {

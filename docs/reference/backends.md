@@ -55,6 +55,8 @@ builder.Services.AddCacheOrchestrator(builder.Configuration, o =>
 
 ## Configure
 
+Redis Output Cache uses a private connection registration, separate from named Data Cache connections. Every Data Cache instance name, including `oc`, remains valid. Health probes use `redis:output-cache` and `redis:data-cache:{instance}` so the two layers also remain distinguishable in diagnostics.
+
 ```json
 {
 "Cache": {

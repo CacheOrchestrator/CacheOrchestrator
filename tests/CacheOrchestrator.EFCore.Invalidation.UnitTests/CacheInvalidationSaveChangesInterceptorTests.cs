@@ -308,7 +308,7 @@ public class CacheInvalidationSaveChangesInterceptorTests
 
         EntityCacheMappingResolver resolver = new(monitor);
         return new CacheInvalidationSaveChangesInterceptor(
-            inv,
+            new CacheInvalidationTransactionInterceptor(inv, NullLogger<CacheInvalidationTransactionInterceptor>.Instance),
             resolver,
             monitor,
             NullLogger<CacheInvalidationSaveChangesInterceptor>.Instance);

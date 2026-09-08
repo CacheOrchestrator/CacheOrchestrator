@@ -15,9 +15,6 @@ public sealed class DataCacheProviderCapabilities
     /// <summary>Whether the provider can coordinate invalidation through a backplane.</summary>
     public bool SupportsBackplane { get; init; }
 
-    /// <summary>Whether the provider supports a configured per-entry size limit.</summary>
-    public bool SupportsEntrySizeLimit { get; init; }
-
     /// <summary>Whether the provider implements <see cref="IDataCacheBatchInvalidator"/>.</summary>
     public bool SupportsBatchInvalidation { get; init; }
 }

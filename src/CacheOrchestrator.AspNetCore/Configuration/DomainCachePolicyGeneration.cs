@@ -19,16 +19,16 @@ internal static class DomainCachePolicyGeneration
         Add(value, "varyOutputCacheByUser", options.VaryOutputCacheByUser);
         Add(value, "treatAuthorizationAsAuthSignal", options.TreatAuthorizationAsAuthSignal);
         Add(value, "authVaryIncludeAuthorizationHash", options.AuthVaryIncludeAuthorizationHash);
-        Add(value, "varyByAuthClaims", options.VaryByAuthClaims);
+        Add(value, "varyByAuthClaims", options.VaryByAuthClaimsArray);
         Add(value, "varyByAccept", options.VaryByAccept);
-        Add(value, "acceptNormalizationList", options.AcceptNormalizationList);
+        Add(value, "acceptNormalizationList", options.AcceptNormalizationListArray);
         Add(value, "varyByAcceptLanguage", options.VaryByAcceptLanguage);
-        Add(value, "acceptLanguageNormalizationList", options.AcceptLanguageNormalizationList);
-        Add(value, "varyByHeaders", options.VaryByHeaders);
-        Add(value, "varyByQueryKeys", options.VaryByQueryKeys);
-        Add(value, "ignoreQueryKeys", options.IgnoreQueryKeys);
-        Add(value, "varyByCookies", options.VaryByCookies);
-        Add(value, "encodingNormalizationList", options.EncodingNormalizationList);
+        Add(value, "acceptLanguageNormalizationList", options.AcceptLanguageNormalizationListArray);
+        Add(value, "varyByHeaders", options.VaryByHeadersArray);
+        Add(value, "varyByQueryKeys", options.VaryByQueryKeysArray);
+        Add(value, "ignoreQueryKeys", options.IgnoreQueryKeysArray);
+        Add(value, "varyByCookies", options.VaryByCookiesArray);
+        Add(value, "encodingNormalizationList", options.EncodingNormalizationListArray);
 
         if (outputCache)
         {

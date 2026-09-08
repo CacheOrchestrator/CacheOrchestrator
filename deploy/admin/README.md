@@ -62,9 +62,11 @@ The image ships **product** rules in `hints/core-hints.json` (always loaded). It
 Production defaults:
 
 ```json
-"Hints": {
-  "RuleFiles": [ "data/rules/*.json" ],
-  "DisabledStatePath": "data/disabled.local.json"
+{
+  "Hints": {
+    "RuleFiles": [ "data/rules/*.json" ],
+    "DisabledStatePath": "data/disabled.local.json"
+  }
 }
 ```
 
@@ -100,7 +102,7 @@ Save the following as **`admin-appsettings.json`** (same content as [appsettings
 For your own environment, change **`ApiKey`** and **`Instances`** (and Metrics if you use it).  
 **`ApiKey` must always match `Cache:Admin:ApiKey` on each monitored application.**
 
-```json
+```jsonc
 {
   "AdminConsole": {
     // Defaults below match the Playground sample (samples/CacheOrchestrator.Sample).

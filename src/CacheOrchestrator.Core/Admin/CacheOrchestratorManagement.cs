@@ -31,6 +31,7 @@ internal sealed class CacheOrchestratorManagement : ICacheOrchestratorManagement
     private readonly ILogger<CacheOrchestratorManagement> _logger;
     private readonly IDataCacheProvider _dataCacheProvider;
     private readonly IDomainVersionChangeObserver[] _versionChangeObservers;
+    private readonly DomainSettingCatalog _catalog;
     private readonly DomainSettingsInvalidationCoordinator? _settingsInvalidation;
 
     public CacheOrchestratorManagement(
@@ -50,7 +51,8 @@ internal sealed class CacheOrchestratorManagement : ICacheOrchestratorManagement
         IEnumerable<IDomainSettingsPatchContributor>? settingsContributors = null,
         IDataCacheProvider? dataCacheProvider = null,
         IEnumerable<IDomainVersionChangeObserver>? versionChangeObservers = null,
-        DomainSettingsInvalidationCoordinator? settingsInvalidation = null)
+        DomainSettingsInvalidationCoordinator? settingsInvalidation = null,
+        DomainSettingCatalog? catalog = null)
     {
         ArgumentNullException.ThrowIfNull(stats);
         ArgumentNullException.ThrowIfNull(endpoints);
@@ -80,6 +82,7 @@ internal sealed class CacheOrchestratorManagement : ICacheOrchestratorManagement
         _dataCacheProvider = dataCacheProvider ?? NullDataCacheProvider.Instance;
         _versionChangeObservers = versionChangeObservers is null ? [] : [.. versionChangeObservers];
         _settingsInvalidation = settingsInvalidation;
+        _catalog = catalog ?? DomainSettingCatalog.Core;
     }
 
     public async Task<AdminHealthDto> GetHealthAsync(CancellationToken cancellationToken = default)
@@ -297,7 +300,7 @@ internal sealed class CacheOrchestratorManagement : ICacheOrchestratorManagement
     public AdminDomainSettingsCatalogDto GetDomainSettingsCatalog() =>
         new()
         {
-            Settings = DomainSettingCatalog.GetEntries()
+            Settings = _catalog.GetEntries()
         };
 
     public async Task<CacheInvalidationResult> InvalidateAsync(
@@ -409,24 +412,16 @@ internal sealed class CacheOrchestratorManagement : ICacheOrchestratorManagement
             throw new ArgumentException("settings must contain at least one entry.", nameof(request));
 
         string normalizedDomain = DomainName.Normalize(domain);
-        string[] settingIds = DomainSettingsInvalidationCoordinator.CanonicalizeSettingIds(request.Settings.Keys);
-        IReadOnlyDictionary<string, System.Text.Json.JsonElement>? before =
-            _settingsInvalidation?.Capture(normalizedDomain, settingIds);
-        DomainSettingsPatchApplicator.Apply(
-            normalizedDomain,
-            request.Settings,
-            _overrides,
-            _settingsContributors);
-
-        if (_settingsInvalidation is not null && before is not null)
+        IReadOnlyList<string> localErrors = [];
+        if (_settingsInvalidation is not null)
         {
-            await _settingsInvalidation.ApplyAsync(
-                    normalizedDomain,
-                    settingIds,
-                    before,
-                    request.ApplyImmediately,
-                    cancellationToken)
-                .ConfigureAwait(false);
+            DomainSettingsInvalidationPlan plan = _settingsInvalidation.ApplyPatch(
+                normalizedDomain, request.Settings, _overrides, _settingsContributors, request.ApplyImmediately);
+            localErrors = await _settingsInvalidation.ApplyAsync(plan, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            DomainSettingsPatchApplicator.Apply(normalizedDomain, request.Settings, _overrides, _settingsContributors, _catalog);
         }
 
         ClusterPublishResult? clusterPublish = null;
@@ -444,7 +439,8 @@ internal sealed class CacheOrchestratorManagement : ICacheOrchestratorManagement
         {
             Domain = normalizedDomain,
             Effective = _domainConfig.GetDomainConfig(normalizedDomain),
-            ClusterPublish = clusterPublish
+            ClusterPublish = clusterPublish,
+            LocalInvalidationErrors = localErrors
         };
     }
 

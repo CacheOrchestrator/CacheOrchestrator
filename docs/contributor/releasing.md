@@ -70,7 +70,7 @@ Three separate gates cover different failure modes. A successful `dotnet build` 
 
 ### Public API analyzer (build time)
 
-All packable libraries are listed in `_PublicApiProjectNames` in [`Directory.Build.props`](../../Directory.Build.props). They use `Microsoft.CodeAnalysis.PublicApiAnalyzers` and keep their contracts under:
+All packable libraries are listed in `ReleasePackageNames` in [`eng/ReleaseProjects.props`](../../eng/ReleaseProjects.props), imported by [`Directory.Build.props`](../../Directory.Build.props). They use `Microsoft.CodeAnalysis.PublicApiAnalyzers` and keep their contracts under:
 
 ```text
 eng/PublicApi/{Project}/PublicAPI.Shipped.txt
@@ -115,19 +115,13 @@ Use the latest applicable stable version from the same major line. Baseline vali
 
 ### Packaged analyzer consumer smoke
 
-Analyzer unit tests verify `COIDENTITY001` logic. The **Package analyzer consumer smoke** step in [`.github/workflows/build.yml`](../../.github/workflows/build.yml) additionally verifies delivery from the generated packages on every pull request to `main` and every push to `main`:
+Analyzer unit tests verify `COIDENTITY001` logic. The shared verification action used by [`.github/workflows/build.yml`](../../.github/workflows/build.yml) additionally verifies delivery from generated packages on every pull request to `main` and every push to `main`.
 
-1. Pack `CacheOrchestrator.Core`, `CacheOrchestrator.FusionCache`, `CacheOrchestrator.AspNetCore`, and the `CacheOrchestrator` meta package.
-2. Confirm that the `CacheOrchestrator.AspNetCore` nupkg contains `analyzers/dotnet/cs/CacheOrchestrator.Analyzers.dll`.
-3. Create an external `net8.0` project with only the meta package installed.
-4. Compile an action with duplicate `GET` identity bindings.
-5. Require the consumer build to fail with `COIDENTITY001` from the packaged analyzer.
+Both workflows invoke [the shared verification action](../../.github/actions/verify/action.yml) and [eng/verify-release.ps1](../../eng/verify-release.ps1). It checks the package inventory against all packable source projects, builds the solution, discovers every test project and its declared target frameworks, runs unit and container integration tests, packs all fourteen libraries, and validates package assets and analyzer placement. Test runs must execute every discovered test; skips or missing coverage fail the gate.
 
-The analyzer is physically packed once in `CacheOrchestrator.AspNetCore`; meta-package consumers receive it transitively. Do not also embed it in the meta package, because that executes the same analyzer twice and duplicates diagnostics.
+A fresh external consumer uses source mapping and an isolated package cache so every CacheOrchestrator assembly comes from the just-built packages. Each SDK gets its own directory, SDK policy and package cache. The matrix runs net8.0 under the actual .NET 8.0.4xx SDK and runs both net8.0 and net10.0 under the source-build SDK 10 policy. Consumer code uses C# 12; `sdk.log` records the selected SDK and a major-version mismatch fails validation. Each matrix entry resolves Core, Hybrid web and Fusion web compositions, compiles the documented provider/settings examples, accepts unrelated same-name attributes, and requires duplicate real identity bindings to fail with COIDENTITY001. The analyzer is physically packed only in CacheOrchestrator.AspNetCore and flows transitively to meta consumers.
 
-The adjacent **Edge package smoke** packs `CacheOrchestrator.Edge`, `CacheOrchestrator.Edge.Cloudflare`, and `CacheOrchestrator.Edge.Varnish` on every pull request and push to `main`. This runs their SDK package-validation checks before a release is created.
-
-The release publish workflow packs the final package set and therefore runs SDK package validation. It does not repeat the external analyzer consumer project; the release checklist requires the commit on `main` to pass **Build and Test** before tagging.
+Both workflows also run the Minimal sample, check local Markdown paths/anchors and JSON examples, and build the Admin Console image before publication is possible. The image smoke runs a real Minimal origin behind an authenticated nginx proxy and checks partial/all-origin outages; browser interaction remains a local release-candidate check. Logs, TRX results and Cobertura coverage are retained for 14 days even on failure. Coverage is evidence for review, not a universal percentage target: prioritize failure, concurrency and lifecycle branches and explain uncovered external-system paths. No production Cloudflare account is needed for deterministic provider tests.
 
 ## Checklist
 
@@ -145,7 +139,7 @@ The release publish workflow packs the final package set and therefore runs SDK 
    This triggers [`.github/workflows/publish.yml`](../../.github/workflows/publish.yml):
    - unit tests (`Core` / `FusionCache` / `HybridCache` / `AspNetCore` / `Edge` / `Edge.Cloudflare` / `Edge.Varnish` / `Redis.Shared` / `AspNetCore.Redis` / `FusionCache.Redis` / Redis meta / `HttpBus` / EF) on net8 + net10; Admin Console App on net10
    - integration tests on net8/net10 + Redis and Varnish Testcontainers; Minimal sample smoke
-   - `dotnet pack` for **all** packable NuGet libraries → `.nupkg` + `.snupkg` (includes Redis.Shared as support; see pack list in `publish.yml`); each pack runs SDK package validation
+   - `dotnet pack` for **all** packable NuGet libraries → `.nupkg` + `.snupkg` (includes Redis.Shared as support; see `eng/ReleaseProjects.props`); each pack runs SDK package validation
    - **NuGet Trusted Publishing** (OIDC via `NuGet/login@v1`)
    - **Admin Console App Docker image** → `ghcr.io/cacheorchestrator/cacheorchestrator-admin-console` (same version tags)
 
@@ -172,81 +166,15 @@ Not enabled in CI. Sign locally with `dotnet nuget sign` if you have a certifica
 
 ## Local pack smoke test
 
-Pack **all** NuGet libraries listed in `publish.yml`. Do **not** `dotnet pack` the whole solution — Benchmarks would produce an unwanted nupkg if packable.
+Use PowerShell 7 on Windows, Linux or macOS. Docker is required for integration tests. The repository pins the .NET SDK feature band in [global.json](../../global.json), accepts servicing patches within that band and uses C# 14 explicitly. Install SDK 8.0.400 or a later 8.0.4xx servicing patch as well; the consumer SDK policy is in [global.net8.json](../../eng/PackageConsumer/global.net8.json). Update global.json and both Dockerfile SDK tags together when changing the source-build toolchain. `-Phase Consumers -ConsumerSdk 8` or `-ConsumerSdk 10` runs one SDK group locally; the default and CI run both groups.
 
-```bash
-dotnet restore CacheOrchestrator.slnx
-dotnet build CacheOrchestrator.slnx -c Release --no-restore
-
-mkdir -p nupkg
-for proj in \
-  src/CacheOrchestrator.Core/CacheOrchestrator.Core.csproj \
-  src/CacheOrchestrator.AspNetCore/CacheOrchestrator.AspNetCore.csproj \
-  src/CacheOrchestrator.FusionCache/CacheOrchestrator.FusionCache.csproj \
-  src/CacheOrchestrator.HybridCache/CacheOrchestrator.HybridCache.csproj \
-  src/CacheOrchestrator.Edge/CacheOrchestrator.Edge.csproj \
-  src/CacheOrchestrator.Edge.Cloudflare/CacheOrchestrator.Edge.Cloudflare.csproj \
-  src/CacheOrchestrator.Edge.Varnish/CacheOrchestrator.Edge.Varnish.csproj \
-  src/CacheOrchestrator/CacheOrchestrator.csproj \
-  src/CacheOrchestrator.Redis.Shared/CacheOrchestrator.Redis.Shared.csproj \
-  src/CacheOrchestrator.AspNetCore.Redis/CacheOrchestrator.AspNetCore.Redis.csproj \
-  src/CacheOrchestrator.FusionCache.Redis/CacheOrchestrator.FusionCache.Redis.csproj \
-  src/CacheOrchestrator.Redis/CacheOrchestrator.Redis.csproj \
-  src/CacheOrchestrator.HttpBus/CacheOrchestrator.HttpBus.csproj \
-  src/CacheOrchestrator.EFCore.Invalidation/CacheOrchestrator.EFCore.Invalidation.csproj
-do
-  dotnet pack "$proj" -c Release --no-build -o ./nupkg
-done
-ls nupkg
+```powershell
+./eng/verify-release.ps1 -Phase All
+./eng/verify-docs.ps1
+docker build -f src/CacheOrchestrator.AdminConsole/Dockerfile -t cacheorchestrator-admin-console:verify .
+./eng/smoke-admin.ps1
 ```
 
-Expect 14 `.nupkg` and 14 `.snupkg` files. Any package-validation diagnostic fails the corresponding pack and must be reviewed before release.
+The default output is `.artifacts/release`; use `-Artifacts _local/release-check-2` for a fresh run. The script refuses to mix packages in a nonempty package output directory. Individual phases are `Inventory`, `Build`, `Tests`, `Pack`, and `Consumers`. Tests and packing require a matching Release build. All phases run locally without publishing anything; only the release-triggered workflow owns publication credentials.
 
-For the analyzer delivery smoke, use the generated package set as a local NuGet source and reproduce the consumer from `build.yml`. The consumer build is expected to fail; success is a smoke-test failure:
-
-```bash
-unzip -l nupkg/CacheOrchestrator.AspNetCore.*.nupkg | \
-  grep "analyzers/dotnet/cs/CacheOrchestrator.Analyzers.dll"
-
-consumer_dir=$(mktemp -d)
-dotnet new classlib --framework net8.0 --name PackageConsumer --output "$consumer_dir"
-dotnet add "$consumer_dir/PackageConsumer.csproj" package CacheOrchestrator \
-  --source "$PWD/nupkg" --prerelease
-
-cat > "$consumer_dir/Class1.cs" <<'EOF'
-using CacheOrchestrator.Identity;
-
-namespace PackageConsumer;
-
-public sealed class DuplicateIdentity
-{
-    [CacheIdentity(new[] { "GET" }, "first")]
-    [CacheIdentity(new[] { "GET" }, "second")]
-    public void Execute() { }
-}
-EOF
-
-set +e
-dotnet build "$consumer_dir/PackageConsumer.csproj" > "$consumer_dir/build.log" 2>&1
-consumer_exit=$?
-set -e
-if [ "$consumer_exit" -eq 0 ]; then
-  cat "$consumer_dir/build.log"
-  echo "Expected COIDENTITY001 from the packaged analyzer."
-  exit 1
-fi
-if ! grep -q "COIDENTITY001" "$consumer_dir/build.log"; then
-  cat "$consumer_dir/build.log"
-  echo "Consumer build failed without COIDENTITY001."
-  exit 1
-fi
-echo "Packaged analyzer emitted COIDENTITY001 as expected."
-```
-
-The final message confirms success. This external-project check is different from:
-
-```bash
-dotnet test tests/CacheOrchestrator.Analyzers.UnitTests/CacheOrchestrator.Analyzers.UnitTests.csproj -c Release
-```
-
-Run the unit tests for analyzer behavior and the package consumer smoke for analyzer delivery.
+The package gate expects one nupkg and one snupkg per inventory entry, both framework assemblies and XML documentation, the package README/icon, and exactly one analyzer placement. SDK compatibility diagnostics fail packing. The complete test/consumer logs are the evidence to review before tagging.

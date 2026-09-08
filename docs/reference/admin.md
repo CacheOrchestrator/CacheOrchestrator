@@ -245,11 +245,17 @@ X-CacheOrchestrator-Admin-Key: <key>
 }
 ```
 
+A settings request is atomic within one process: Core, HTTP and Fusion overlays are prepared together, then every package validates the effective merged state before a single publication. An invalid field, missing or ambiguous owner, invalid enum, or incompatible TTL/timeout combination rejects the entire patch with HTTP 400. Previous overlays and their revision remain unchanged. Cross-setting checks include configuration defaults and existing overrides, including Fusion fail-safe constraints when only the Core Data Cache TTL changes. Setting client TTL to zero retains its documented disabled behavior.
+
+Concurrent patches to the same domain are serialized during preparation; reads use the published immutable state without a lock. Clearing the domain through `IDomainRuntimeOverrideStore.Clear` clears all package sections and advances the revision. An already pinned request retains its snapshot.
+
 Use `GET /domain-settings/catalog` as the canonical list. A setting is writable only when its catalog entry has `runtimeOverlay: true`; IDs are matched case-insensitively, values are validated by their declared kind, and omitted settings keep their current values. Fusion IDs appear only when the FusionCache package has registered its catalog section and patch contributor.
 
 `applyImmediately` defaults to `false`. Most policy changes then affect newly stored entries while existing entries keep the policy with which they were created until natural expiration. Key-shaping changes are an exception: Output Cache and HTTP-derived Data Cache switch to a deterministic new key generation immediately, without scanning or purging the old generation. Edge safety changes are also purged automatically. With `applyImmediately: true`, supported policy reductions additionally invalidate the affected domain layer once; increases do not evict entries. See [configuration — change activation and invalidation](configuration.md#domain-setting-change-activation-and-invalidation) for the complete table.
 
 `distribute: true` carries both the patch and `applyImmediately` to HttpBus peers. Every peer applies its local Output/Data Cache action, while only the originating instance queues the external Edge purge. This avoids one Edge purge per application instance.
+
+If local post-settings purging fails, HTTP **503** includes `localApplied: true` and the mutation `result`, including `localInvalidationErrors`. The published settings remain active. A new Admin PATCH is a new mutation; after repairing the backend, explicitly invalidate the domain when the earlier purge was incomplete.
 
 A successful Version or settings mutation returns the normalized `domain` and complete effective domain snapshot. With `distribute: true`, a peer failure returns `409` with `localApplied: true`, command metadata, and `peerFailures`; the local mutation is not rolled back.
 

@@ -224,6 +224,9 @@ public sealed class AdminDomainSettingsCatalogDto
 /// <summary>Response after version or settings mutation.</summary>
 public sealed class AdminDomainMutationResultDto
 {
+    /// <summary>Errors from local post-mutation purging. The settings mutation remains applied.</summary>
+    public IReadOnlyList<string> LocalInvalidationErrors { get; init; } = [];
+
     /// <summary>Domain name.</summary>
     public required string Domain { get; init; }
 

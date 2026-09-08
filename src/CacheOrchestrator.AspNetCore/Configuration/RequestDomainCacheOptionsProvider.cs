@@ -11,15 +11,13 @@ namespace CacheOrchestrator.Configuration;
 /// </summary>
 internal sealed class RequestDomainCacheOptionsProvider : IRequestDomainCacheOptions, IDisposable
 {
-    private static readonly string[] DefaultAcceptNormalization = ["application/json", "application/xml"];
-
     private readonly IDomainCacheOptionsProvider _coreOptions;
     private readonly IOptionsMonitor<CacheOrchestratorOptions> _coreOptionsMonitor;
     private readonly IOptionsMonitor<CacheOrchestratorHttpOptions> _httpOptionsMonitor;
     private readonly IDomainRuntimeOverrideStore _coreRuntimeOverrides;
     private readonly IHttpDomainRuntimeOverrideStore _httpRuntimeOverrides;
     private readonly ILogger<RequestDomainCacheOptionsProvider> _logger;
-    private readonly ConcurrentDictionary<string, CachedHttpOptions> _globalCache = new(StringComparer.Ordinal);
+    private ConcurrentDictionary<string, CachedHttpOptions> _globalCache = new(StringComparer.Ordinal);
     private readonly IDisposable? _coreChangeRegistration;
     private readonly IDisposable? _httpChangeRegistration;
 
@@ -44,8 +42,8 @@ internal sealed class RequestDomainCacheOptionsProvider : IRequestDomainCacheOpt
         _logger = logger;
         _coreRuntimeOverrides = coreRuntimeOverrides;
         _httpRuntimeOverrides = httpRuntimeOverrides;
-        _coreChangeRegistration = _coreOptionsMonitor.OnChange(_ => _globalCache.Clear());
-        _httpChangeRegistration = _httpOptionsMonitor.OnChange(_ => _globalCache.Clear());
+        _coreChangeRegistration = _coreOptionsMonitor.OnChange(_ => Interlocked.Exchange(ref _globalCache, new(StringComparer.Ordinal)));
+        _httpChangeRegistration = _httpOptionsMonitor.OnChange(_ => Interlocked.Exchange(ref _globalCache, new(StringComparer.Ordinal)));
     }
 
     private sealed class CachedHttpOptions
@@ -67,21 +65,35 @@ internal sealed class RequestDomainCacheOptionsProvider : IRequestDomainCacheOpt
         int coreStamp = _coreRuntimeOverrides.GetStamp(normalized);
         int httpStamp = _httpRuntimeOverrides.GetStamp(normalized);
 
-        if (_globalCache.TryGetValue(normalized, out CachedHttpOptions? cached)
+        ConcurrentDictionary<string, CachedHttpOptions> generation = Volatile.Read(ref _globalCache);
+        if (generation.TryGetValue(normalized, out CachedHttpOptions? cached)
             && cached.CoreOverrideStamp == coreStamp
             && cached.HttpOverrideStamp == httpStamp)
         {
             return cached.Options;
         }
 
-        DomainHttpCacheOptions options = CreateDomainOptions(normalized);
-        _globalCache[normalized] = new CachedHttpOptions
+        // A mutation may publish between Core and HTTP reads. Retry construction, never cache
+        // or return a combination assembled from different runtime revisions.
+        for (int attempt = 0; attempt < 8; attempt++)
         {
-            Options = options,
-            CoreOverrideStamp = coreStamp,
-            HttpOverrideStamp = httpStamp
-        };
-        return options;
+            DomainHttpCacheOptions options = CreateDomainOptions(normalized);
+            int currentCoreStamp = _coreRuntimeOverrides.GetStamp(normalized);
+            int currentHttpStamp = _httpRuntimeOverrides.GetStamp(normalized);
+            if (currentCoreStamp == coreStamp && currentHttpStamp == httpStamp)
+            {
+                generation[normalized] = new CachedHttpOptions
+                {
+                    Options = options,
+                    CoreOverrideStamp = coreStamp,
+                    HttpOverrideStamp = httpStamp
+                };
+                return options;
+            }
+            coreStamp = currentCoreStamp;
+            httpStamp = currentHttpStamp;
+        }
+        throw new InvalidOperationException($"Runtime settings for domain '{normalized}' changed repeatedly during snapshot construction.");
     }
 
     public DomainHttpCacheOptions EnsureDomainOptions(HttpContext http, string domain)
@@ -148,9 +160,9 @@ internal sealed class RequestDomainCacheOptionsProvider : IRequestDomainCacheOpt
                 ?? Pick(domainSettings.TreatAuthorizationAsAuthSignal, defaults.TreatAuthorizationAsAuthSignal, true),
             AuthVaryIncludeAuthorizationHash = overlay?.AuthVaryIncludeAuthorizationHash
                 ?? Pick(domainSettings.AuthVaryIncludeAuthorizationHash, defaults.AuthVaryIncludeAuthorizationHash, true),
-            VaryByAuthClaims = Copy(overlay?.VaryByAuthClaims
+            VaryByAuthClaims = overlay?.VaryByAuthClaims
                 ?? domainSettings.VaryByAuthClaims
-                ?? defaults.VaryByAuthClaims),
+                ?? defaults.VaryByAuthClaims,
             DataCacheRespectAuthBypass = overlay?.DataCacheRespectAuthBypass
                 ?? Pick(domainSettings.DataCacheRespectAuthBypass, defaults.DataCacheRespectAuthBypass, true),
             ClientForcePrivateWhenAuthenticated = overlay?.ClientForcePrivateWhenAuthenticated
@@ -160,27 +172,28 @@ internal sealed class RequestDomainCacheOptionsProvider : IRequestDomainCacheOpt
                     true),
             VaryByAccept = overlay?.VaryByAccept
                 ?? Pick(domainSettings.VaryByAccept, defaults.VaryByAccept, true),
-            AcceptNormalizationList = Copy(overlay?.AcceptNormalizationList
+            // Raw Accept is the default. Configured tokens may canonicalize spelling, never
+            // select a formatter or discard other negotiation information.
+            AcceptNormalizationList = overlay?.AcceptNormalizationList
                 ?? domainSettings.AcceptNormalizationList
-                ?? defaults.AcceptNormalizationList
-                ?? DefaultAcceptNormalization),
+                ?? defaults.AcceptNormalizationList,
             VaryByAcceptLanguage = overlay?.VaryByAcceptLanguage
                 ?? Pick(domainSettings.VaryByAcceptLanguage, defaults.VaryByAcceptLanguage, false),
-            AcceptLanguageNormalizationList = Copy(overlay?.AcceptLanguageNormalizationList
+            AcceptLanguageNormalizationList = overlay?.AcceptLanguageNormalizationList
                 ?? domainSettings.AcceptLanguageNormalizationList
-                ?? defaults.AcceptLanguageNormalizationList),
-            VaryByHeaders = Copy(overlay?.VaryByHeaders
+                ?? defaults.AcceptLanguageNormalizationList,
+            VaryByHeaders = overlay?.VaryByHeaders
                 ?? domainSettings.VaryByHeaders
-                ?? defaults.VaryByHeaders),
-            VaryByQueryKeys = Copy(overlay?.VaryByQueryKeys
+                ?? defaults.VaryByHeaders,
+            VaryByQueryKeys = overlay?.VaryByQueryKeys
                 ?? domainSettings.VaryByQueryKeys
-                ?? defaults.VaryByQueryKeys),
-            IgnoreQueryKeys = Copy(overlay?.IgnoreQueryKeys
+                ?? defaults.VaryByQueryKeys,
+            IgnoreQueryKeys = overlay?.IgnoreQueryKeys
                 ?? domainSettings.IgnoreQueryKeys
-                ?? defaults.IgnoreQueryKeys),
-            VaryByCookies = Copy(overlay?.VaryByCookies
+                ?? defaults.IgnoreQueryKeys,
+            VaryByCookies = overlay?.VaryByCookies
                 ?? domainSettings.VaryByCookies
-                ?? defaults.VaryByCookies),
+                ?? defaults.VaryByCookies,
             EmitResponseVary = overlay?.EmitResponseVary
                 ?? Pick(domainSettings.EmitResponseVary, defaults.EmitResponseVary, true),
             ETagMode = overlay?.ETagMode
@@ -188,12 +201,12 @@ internal sealed class RequestDomainCacheOptionsProvider : IRequestDomainCacheOpt
                 ?? defaults.OutputCache?.ETagMode
                 ?? ETagMode.Version,
             ETag = CacheETagFactory.FromVersion(core.Version),
-            CacheableStatusCodes = Copy(domainSettings.OutputCache?.CacheableStatusCodes
+            CacheableStatusCodes = domainSettings.OutputCache?.CacheableStatusCodes
                 ?? defaults.OutputCache?.CacheableStatusCodes
-                ?? [200])!,
-            EncodingNormalizationList = Copy(domainSettings.OutputCache?.EncodingNormalizationList
+                ?? [200],
+            EncodingNormalizationList = domainSettings.OutputCache?.EncodingNormalizationList
                 ?? defaults.OutputCache?.EncodingNormalizationList
-                ?? ["br", "gzip"]),
+                ?? ["br", "gzip"],
             ClientCacheability = overlay?.ClientCacheability
                 ?? domainSettings.ClientCache?.Cacheability
                 ?? defaults.ClientCache?.Cacheability
@@ -225,8 +238,6 @@ internal sealed class RequestDomainCacheOptionsProvider : IRequestDomainCacheOpt
 
     private static TimeSpan Seconds(int value) =>
         TimeSpan.FromSeconds(value < 0 ? 0 : value);
-
-    private static T[]? Copy<T>(T[]? values) => values is null ? null : [.. values];
 
     private static int ToNonNegativeSeconds(TimeSpan value)
     {

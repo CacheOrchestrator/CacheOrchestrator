@@ -6,7 +6,6 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <LangVersion>latest</LangVersion>
     <RootNamespace>CacheOrchestrator.FusionCache.UnitTests</RootNamespace>
   </PropertyGroup>
 

@@ -1,4 +1,6 @@
 using CacheOrchestrator.Edge.Configuration;
+using CacheOrchestrator.Edge.Invalidation;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace CacheOrchestrator.Edge.Providers;
@@ -14,11 +16,13 @@ internal sealed class EdgeInstanceResolver
     private readonly IOptionsMonitor<CacheOrchestratorEdgeOptions> _options;
     private readonly IOptionsMonitor<CacheOrchestrator.Configuration.CacheOrchestratorOptions> _coreOptions;
     private readonly EdgeProviderCatalog _providers;
+    private readonly EdgeConfigurationRegistration _registration;
 
     public EdgeInstanceResolver(
         IOptionsMonitor<CacheOrchestratorEdgeOptions> options,
         IOptionsMonitor<CacheOrchestrator.Configuration.CacheOrchestratorOptions> coreOptions,
-        EdgeProviderCatalog providers)
+        EdgeProviderCatalog providers,
+        EdgeConfigurationRegistration registration)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(coreOptions);
@@ -26,7 +30,12 @@ internal sealed class EdgeInstanceResolver
         _options = options;
         _coreOptions = coreOptions;
         _providers = providers;
+        _registration = registration;
     }
+
+    public EdgeInvalidationTarget CaptureTarget(string name, string providerName, IConfigurationSection? instanceConfiguration = null) =>
+        _providers.ResolveInvalidation(providerName).CaptureTarget(name,
+            instanceConfiguration ?? _registration.Configuration.GetSection($"{_registration.ConfigSection}:EdgeInstances:{name}"));
 
     public ResolvedEdgeInstance Resolve(string name)
     {

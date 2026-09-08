@@ -1,8 +1,8 @@
 # EF Core SaveChanges invalidation
 
-> **Reference** — purge mapped entities after EF Core `SaveChanges`.
+> **Reference** — purge mapped entities after the owning transaction commits.
 
-Package **`CacheOrchestrator.EFCore.Invalidation`**. After a successful `SaveChanges` / `SaveChangesAsync`, the cache for the rows that changed is purged through `ICacheOrchestratorInvalidator`.
+Package **`CacheOrchestrator.EFCore.Invalidation`**. After `SaveChanges` / `SaveChangesAsync` succeeds and its owning transaction commits, the cache for the rows that changed is purged through `ICacheOrchestratorInvalidator`.
 
 Package README: [src/CacheOrchestrator.EFCore.Invalidation/README.md](../../src/CacheOrchestrator.EFCore.Invalidation/README.md). See also [invalidation.md](invalidation.md), [domain-profiles.md](../guide/domain-profiles.md), [Data Cache](data-cache.md), [configuration.md](configuration.md).
 
@@ -14,6 +14,7 @@ Package README: [src/CacheOrchestrator.EFCore.Invalidation/README.md](../../src/
 - [Install and composition](#install-and-composition)
 - [Mapping (code only)](#mapping-code-only)
 - [What runs on SaveChanges](#what-runs-on-savechanges)
+- [Transaction boundaries](#transaction-boundaries)
 - [SaveChanges vs `Execute*`](#savechanges-vs-execute)
 - [Multi-instance](#multi-instance)
 - [Configuration (`Cache:EFCore:Invalidation`)](#configuration-cacheefcoreinvalidation)
@@ -41,6 +42,9 @@ SaveChanges (DB)
         │                              │
 SavedChanges                    SaveChangesFailed
         │                         discard snapshot
+        ▼
+Owning transaction commits (or save already committed)
+        │
         ▼
 InvalidateEntitiesAsync  or  InvalidateEntityKindAsync (OnBulk)
         │
@@ -84,11 +88,11 @@ dotnet add package CacheOrchestrator.EFCore.Invalidation --prerelease
 
 | API | Notes |
 |-----|--------|
-| `AddCacheOrchestratorEfCoreInvalidation` | Binds `Cache:EFCore:Invalidation`, registers the interceptor as a **singleton** |
+| `AddCacheOrchestratorEfCoreInvalidation` | Binds `Cache:EFCore:Invalidation`, registers SaveChanges and transaction interceptors as **singletons** |
 | `AddEfCoreInvalidation` | Same registration on `ICacheOrchestratorBuilder` |
-| `AddCacheOrchestratorInvalidation` | Attaches the interceptor to **this** `DbContext` only |
+| `AddCacheOrchestratorInvalidation` | Attaches both interceptors to **this** `DbContext` only |
 
-`AddCacheOrchestratorInvalidation` attaches that interceptor to **this** `DbContext` only. Call it on each options builder that should invalidate.
+`AddCacheOrchestratorInvalidation` attaches both interceptors to **this** `DbContext` only. Call it on each options builder that should invalidate.
 
 ---
 
@@ -140,12 +144,12 @@ TPH: Fluent `CacheInvalidate` and `Map<T>` match the **exact** `ClrType` — map
 | Event | Behaviour |
 |-------|-----------|
 | `SavingChanges` | Snapshot mapped `Added` / `Modified` / `Deleted`. Per-`DbContext` bag (interceptor is a singleton — no instance fields). Deleted PKs are captured here. |
-| Successful `SavedChanges` | Re-read PK (identity is assigned). Group by `(domain, entityKind)`. Invalidate. |
-| `SaveChangesFailed` | Discard snapshot. No invalidation. |
-| Invalidator throws | Logged. **Save still succeeds.** |
-| Ambient transaction later rolled back | `SavedChanges` already ran → **false miss**, not stale. |
+| Successful `SavedChanges` | Re-read PK (identity is assigned). Capture ids and policy without retaining tracked entries. Invalidate if already committed, otherwise queue for transaction completion. |
+| `SaveChangesFailed` / canceled save | Discard this save's snapshot. Earlier successful saves in the same transaction remain pending. |
+| Invalidator throws or returns partial failure | Logged. A committed database write is not reported as failed because its cache purge failed. |
+| Explicit or ambient rollback | Discard the pending transaction batch. No purge. |
 
-`OnBulk` applies per group when id count ≥ `BulkThreshold`:
+`OnBulk` applies per `(domain, entityKind, bulk policy)` group when the distinct id count reaches `BulkThreshold`. Multiple successful saves in one transaction coalesce before the purge:
 
 | Value | Effect |
 |-------|--------|
@@ -154,6 +158,22 @@ TPH: Fluent `CacheInvalidate` and `Map<T>` match the **exact** `ClrType` — map
 | `Domain` | `InvalidateDomainAsync` — **entire policy group** (products **and** assets in `store`) |
 
 ---
+
+## Transaction boundaries
+
+- An ordinary successful save with no enclosing transaction invalidates before returning.
+- `Database.BeginTransaction` / `BeginTransactionAsync` defers work until the EF `IDbContextTransaction.Commit` / `CommitAsync` callback. Commit awaits invalidation; request cancellation after the database commit does not skip it.
+- Contexts sharing a native transaction through `UseTransaction` and the same application service provider share one pending batch. Commit through the EF wrapper. A raw ADO.NET commit outside EF cannot be observed: its owner must perform explicit invalidation after confirming the outcome.
+- Ambient `TransactionScope` and provider-supported explicit `EnlistTransaction` defer to `TransactionCompleted`. The callback runs after participant outcome notifications. Use `TransactionScopeAsyncFlowOption.Enabled` with async work. `RequiresNew` completes independently of an outer transaction.
+- A savepoint rollback keeps a conservative superset of ids until final commit. It may cause extra misses for rolled-back changes; it never publishes invalidation while the enclosing transaction remains open.
+- Rolled-back/disposed transactions do not leak changes into a reused or pooled context. Only ids and captured bulk policy are retained while the transaction is pending.
+- Delivery remains process-local and best effort. A crash after database commit but before purge, an unknown commit outcome, or a provider failure requires reconciliation/retry by the application. Use an application outbox for durable delivery. Ambient database transaction support still depends on the EF provider; the package does not add it to providers such as InMemory or SQLite.
+
+```csharp
+await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+await db.SaveChangesAsync(cancellationToken); // ids captured; no purge yet
+await transaction.CommitAsync(cancellationToken); // commit, then invalidate
+```
 
 ## SaveChanges vs `Execute*`
 
@@ -180,7 +200,7 @@ Unknown / too many ids: `InvalidateEntityKindAsync("catalog", "products")`.
 
 The EF package does not talk to Redis or the Bus. It only calls `ICacheOrchestratorInvalidator`.
 
-| Topology | After `SaveChanges` on node A |
+| Topology | After the owning transaction commits on node A |
 |----------|-------------------------------|
 | Single process | Local Output Cache + Data Cache only |
 | Redis Fusion L2 + backplane | Shared L2 purged; other nodes drop L1 via Fusion backplane |
@@ -209,8 +229,8 @@ Operational flags only. Bound from the same root section as `AddCacheOrchestrato
 
 - Reads still go through `GetOrSetEntityAsync` and Output Cache as usual.
 - List and index entries tagged only `domain:{name}` stay until TTL, Version, or `InvalidateDomainAsync`.
-- `Execute*` and raw SQL need a manual `Invalidate*` call.
-- Composite primary keys are joined with `:`, then normalized. Binary keys are **hex** (`Convert.ToHexString`) — the HTTP `resourceId` must use the same convention.
+- `Execute*` and raw SQL need a manual `Invalidate*` call after the owning transaction commits.
+- Each composite primary-key part is percent-encoded before joining with `:`. Binary keys use lowercase hexadecimal; the HTTP `resourceId` must use the same convention.
 - `BulkThreshold <= 0` disables the bulk path (always `InvalidateEntitiesAsync`).
 - There is no ambient `Suppress()` API; turn the feature off with `Enabled: false` or omit the interceptor on that context.
 

@@ -31,7 +31,6 @@ public class HybridDataCacheProviderTests
         capabilities.SupportsFailSafe.Should().BeFalse();
         capabilities.SupportsEagerRefresh.Should().BeFalse();
         capabilities.SupportsBackplane.Should().BeFalse();
-        capabilities.SupportsEntrySizeLimit.Should().BeFalse();
         capabilities.SupportsBatchInvalidation.Should().BeTrue();
     }
 
