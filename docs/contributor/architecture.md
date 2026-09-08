@@ -153,4 +153,8 @@ Output Cache and Data Cache providers can differ (for example, InMemory Output C
 - [Output Cache](../reference/output-cache.md) — HTTP policy layer  
 - [Data Cache](../reference/data-cache.md) — Fusion / Hybrid orchestration  
 - [vary.md](../reference/vary.md) — shared vary materializer  
-- [deployment.md](../reference/deployment.md) — multi-instance topologies  
+- [deployment.md](../reference/deployment.md) — multi-instance topologies
+
+### Provider materialization contract
+
+`IDataCacheProvider.GetOrCreateWithTagsAsync` selects complete tags from each newly produced value before publishing that materialization. The selector is not a hit-time operation. Providers must apply this to background refresh as well as foreground misses; implementing it with a post-return `SetAsync` permits stale overwrites and loses background tags. Fusion uses its factory execution context. Hybrid publishes a unique tagged validity marker first and persists the marker key and tags with the payload, validating it on footprint hits. Ordinary provider lookups retain their direct path.

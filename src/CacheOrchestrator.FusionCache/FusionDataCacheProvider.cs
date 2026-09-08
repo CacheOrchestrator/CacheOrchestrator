@@ -62,10 +62,28 @@ internal sealed class FusionDataCacheProvider :
     }
 
     /// <inheritdoc />
-    public async ValueTask<DataCacheProviderResult<T>> GetOrCreateAsync<T>(
+    public ValueTask<DataCacheProviderResult<T>> GetOrCreateAsync<T>(
         DataCacheProviderRequest request,
         Func<CancellationToken, ValueTask<T>> factory,
+        CancellationToken cancellationToken = default) =>
+        GetOrCreateCoreAsync(request, factory, null, cancellationToken);
+
+    /// <inheritdoc />
+    public ValueTask<DataCacheProviderResult<T>> GetOrCreateWithTagsAsync<T>(
+        DataCacheProviderRequest request,
+        Func<CancellationToken, ValueTask<T>> factory,
+        Func<T, IReadOnlyList<string>> tagSelector,
         CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(tagSelector);
+        return GetOrCreateCoreAsync(request, factory, tagSelector, cancellationToken);
+    }
+
+    private async ValueTask<DataCacheProviderResult<T>> GetOrCreateCoreAsync<T>(
+        DataCacheProviderRequest request,
+        Func<CancellationToken, ValueTask<T>> factory,
+        Func<T, IReadOnlyList<string>>? tagSelector,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(factory);
@@ -83,9 +101,17 @@ internal sealed class FusionDataCacheProvider :
                     if (context.HasStaleValue)
                         Interlocked.Exchange(ref factoryHadStaleValue, 1);
 
+                    T value = await factory(token).ConfigureAwait(false);
+                    if (tagSelector is not null)
+                    {
+                        IReadOnlyList<string> finalTags = tagSelector(value);
+                        ArgumentNullException.ThrowIfNull(finalTags);
+                        context.Tags = finalTags as string[] ?? [.. finalTags];
+                    }
+
                     return new FusionProviderCacheEntry<T>
                     {
-                        Value = await factory(token).ConfigureAwait(false),
+                        Value = value,
                         MaterializationId = materializationId
                     };
                 },

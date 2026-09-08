@@ -24,6 +24,7 @@ public class DataCacheProviderHitBenchmarks
     private IDataCacheProvider _hybrid = null!;
     private DataCacheProviderRequest _request = null!;
     private DataCacheProviderRequest _uncachedSettingsRequest = null!;
+    private DataCacheProviderRequest _footprintRequest = null!;
 
     [GlobalSetup]
     public async Task Setup()
@@ -73,6 +74,13 @@ public class DataCacheProviderHitBenchmarks
             DomainOptions = _request.DomainOptions
         };
 
+        _footprintRequest = new DataCacheProviderRequest
+        {
+            Key = "catalog:01:bench-footprint", InstanceName = _request.InstanceName,
+            Tags = _request.Tags, DomainOptions = _request.DomainOptions
+        };
+        await _fusion.GetOrCreateWithTagsAsync(_footprintRequest, Factory, Tags);
+        await _hybrid.GetOrCreateWithTagsAsync(_footprintRequest, Factory, Tags);
         await _fusion.GetOrCreateAsync(_request, Factory);
         await _fusionUncachedSettings.GetOrCreateAsync(_uncachedSettingsRequest, Factory);
         await _hybrid.GetOrCreateAsync(_request, Factory);
@@ -96,6 +104,16 @@ public class DataCacheProviderHitBenchmarks
     [Benchmark]
     public ValueTask<DataCacheProviderResult<string>> Hybrid_L1Hit() =>
         _hybrid.GetOrCreateAsync(_request, Factory);
+
+    [Benchmark]
+    public ValueTask<DataCacheProviderResult<string>> Fusion_DynamicTags_L1Hit() =>
+        _fusion.GetOrCreateWithTagsAsync(_footprintRequest, Factory, Tags);
+
+    [Benchmark]
+    public ValueTask<DataCacheProviderResult<string>> Hybrid_DynamicTags_L1Hit() =>
+        _hybrid.GetOrCreateWithTagsAsync(_footprintRequest, Factory, Tags);
+
+    private static IReadOnlyList<string> Tags(string value) => ["domain:catalog", "entity:catalog:items:42"];
 
     private static ValueTask<string> Factory(CancellationToken cancellationToken) =>
         ValueTask.FromResult("value");

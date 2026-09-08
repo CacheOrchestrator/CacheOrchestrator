@@ -25,8 +25,22 @@ public interface IDataCacheProvider
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets or creates a value whose complete tags are selected after each successful factory execution.
+    /// </summary>
+    /// <remarks>
+    /// Providers must associate the selected tags with the same materialization before publishing it,
+    /// including eager or background refresh. Do not implement this as a post-return overwrite.
+    /// The selector runs only for newly produced values and must include any required request tags.
+    /// </remarks>
+    ValueTask<DataCacheProviderResult<T>> GetOrCreateWithTagsAsync<T>(
+        DataCacheProviderRequest request,
+        Func<CancellationToken, ValueTask<T>> factory,
+        Func<T, IReadOnlyList<string>> tagSelector,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Overwrites the value at <paramref name="request"/>.Key with <paramref name="value"/>
-    /// and the request's tags / domain policy (used to refresh tags after a footprint-aware miss).
+    /// and the request's tags / domain policy.
     /// </summary>
     ValueTask SetAsync<T>(
         DataCacheProviderRequest request,

@@ -35,6 +35,8 @@ Declare primary identity on the endpoint (`resourceRouteKey` + `entityKind`, or 
 
 Invalidation stays `InvalidateEntityAsync` / `InvalidateEntityKindAsync` / `InvalidateEntitiesAsync`.
 
+Every materialization includes its complete footprint, including Fusion eager refresh and background completion after a soft timeout. The HTTP adapter captures primary identity before the factory starts. Application factories that may outlive a request must likewise capture request values beforehand and obtain their own service scope for work that needs scoped services; do not retain `HttpContext` or a request-owned `DbContext` in such factories.
+
 **`EntityCache.Miss<T>()`** means: “for **this request’s primary id** (from `resourceRouteKey` / `SetEntityIdentity`), cache that there is **no value**.” The type argument `T` is only the CLR type of the payload (e.g. `Product` or `ProductDetailsDto`). It is **not** a miss of every product / every DTO — other ids keep their own entries. Returning `null` from `Func<CancellationToken, Task<T?>>` does the same for primary-only footprints.
 
 ---

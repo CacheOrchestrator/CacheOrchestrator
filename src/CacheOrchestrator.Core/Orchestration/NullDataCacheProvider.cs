@@ -15,6 +15,17 @@ internal sealed class NullDataCacheProvider : IDataCacheProvider, IDataCacheProv
     }
 
     /// <inheritdoc />
+    public ValueTask<DataCacheProviderResult<T>> GetOrCreateWithTagsAsync<T>(
+        DataCacheProviderRequest request,
+        Func<CancellationToken, ValueTask<T>> factory,
+        Func<T, IReadOnlyList<string>> tagSelector,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(tagSelector);
+        return GetOrCreateAsync(request, factory, cancellationToken);
+    }
+
+    /// <inheritdoc />
     public string Name => "Null";
 
     public DataCacheProviderCapabilities Capabilities => ProviderCapabilities;
