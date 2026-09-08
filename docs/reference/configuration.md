@@ -186,7 +186,7 @@ For one domain, the Core and ASP.NET Core options providers resolve values in th
 3. `Cache:DomainDefaults`.
 4. Library defaults.
 
-`CacheOrchestrator.Core` produces an immutable `DomainCacheOptions` snapshot for domain identity and Data Cache policy. `CacheOrchestrator.AspNetCore` composes it into `DomainHttpCacheOptions` for Output Cache, Client Cache, authentication, vary, ETag, and HTTP Data Cache key policy. A request reuses its HTTP snapshot; configuration reloads and later overlays affect newly resolved requests, not values already attached to the current request. Provider and connection sections such as `OutputCache`, `DataCacheInstances`, and `Redis` are host composition settings and do not participate in this per-domain merge.
+`CacheOrchestrator.Core` produces an immutable `DomainCacheOptions` snapshot for domain identity and Data Cache policy. `CacheOrchestrator.AspNetCore` composes it into `DomainHttpCacheOptions` for Output Cache, Client Cache, authentication, vary, ETag, and HTTP Data Cache key policy. A request reuses its HTTP snapshot; configuration reloads and later overlays affect newly resolved requests, not values already attached to the current request. Core, HTTP and Fusion replace their snapshot-cache generation on reload. Resolutions already in flight may finish against the previous generation, but cannot repopulate the current generation with stale settings. Provider and connection sections such as `OutputCache`, `DataCacheInstances`, and `Redis` are host composition settings and do not participate in this per-domain merge.
 
 ### Domain-setting change activation and invalidation
 

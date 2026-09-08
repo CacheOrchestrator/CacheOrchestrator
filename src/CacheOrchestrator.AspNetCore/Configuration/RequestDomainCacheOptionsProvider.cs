@@ -17,7 +17,7 @@ internal sealed class RequestDomainCacheOptionsProvider : IRequestDomainCacheOpt
     private readonly IDomainRuntimeOverrideStore _coreRuntimeOverrides;
     private readonly IHttpDomainRuntimeOverrideStore _httpRuntimeOverrides;
     private readonly ILogger<RequestDomainCacheOptionsProvider> _logger;
-    private readonly ConcurrentDictionary<string, CachedHttpOptions> _globalCache = new(StringComparer.Ordinal);
+    private ConcurrentDictionary<string, CachedHttpOptions> _globalCache = new(StringComparer.Ordinal);
     private readonly IDisposable? _coreChangeRegistration;
     private readonly IDisposable? _httpChangeRegistration;
 
@@ -42,8 +42,8 @@ internal sealed class RequestDomainCacheOptionsProvider : IRequestDomainCacheOpt
         _logger = logger;
         _coreRuntimeOverrides = coreRuntimeOverrides;
         _httpRuntimeOverrides = httpRuntimeOverrides;
-        _coreChangeRegistration = _coreOptionsMonitor.OnChange(_ => _globalCache.Clear());
-        _httpChangeRegistration = _httpOptionsMonitor.OnChange(_ => _globalCache.Clear());
+        _coreChangeRegistration = _coreOptionsMonitor.OnChange(_ => Interlocked.Exchange(ref _globalCache, new(StringComparer.Ordinal)));
+        _httpChangeRegistration = _httpOptionsMonitor.OnChange(_ => Interlocked.Exchange(ref _globalCache, new(StringComparer.Ordinal)));
     }
 
     private sealed class CachedHttpOptions
@@ -65,7 +65,8 @@ internal sealed class RequestDomainCacheOptionsProvider : IRequestDomainCacheOpt
         int coreStamp = _coreRuntimeOverrides.GetStamp(normalized);
         int httpStamp = _httpRuntimeOverrides.GetStamp(normalized);
 
-        if (_globalCache.TryGetValue(normalized, out CachedHttpOptions? cached)
+        ConcurrentDictionary<string, CachedHttpOptions> generation = Volatile.Read(ref _globalCache);
+        if (generation.TryGetValue(normalized, out CachedHttpOptions? cached)
             && cached.CoreOverrideStamp == coreStamp
             && cached.HttpOverrideStamp == httpStamp)
         {
@@ -73,7 +74,7 @@ internal sealed class RequestDomainCacheOptionsProvider : IRequestDomainCacheOpt
         }
 
         DomainHttpCacheOptions options = CreateDomainOptions(normalized);
-        _globalCache[normalized] = new CachedHttpOptions
+        generation[normalized] = new CachedHttpOptions
         {
             Options = options,
             CoreOverrideStamp = coreStamp,
