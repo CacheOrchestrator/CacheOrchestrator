@@ -4,7 +4,7 @@ using Microsoft.Net.Http.Headers;
 namespace CacheOrchestrator.Configuration;
 
 /// <summary>
-/// Shared auth-signal and bypass evaluation for Output Cache and FusionCache.
+/// Shared auth-signal and bypass evaluation for Output Cache and Data Cache.
 /// </summary>
 public static class DomainAuthEvaluator
 {
@@ -34,7 +34,7 @@ public static class DomainAuthEvaluator
     }
 
     /// <summary>
-    /// Returns whether Output Cache (and optionally FusionCache) should bypass caching
+    /// Returns whether Output Cache (and optionally Data Cache) should bypass caching
     /// for this request under <see cref="DomainHttpCacheOptions.AuthBypassMode"/>.
     /// </summary>
     public static bool ShouldBypassForAuth(HttpContext http, DomainHttpCacheOptions options)
@@ -68,21 +68,41 @@ public static class DomainAuthEvaluator
             string[]? claimTypes = options.VaryByAuthClaimsArray;
             if (claimTypes is { Length: > 0 })
             {
-                List<string> parts = new(claimTypes.Length);
+                List<(string Type, string Value)> parts = new(claimTypes.Length);
+                int length = "claims2:".Length;
                 for (int i = 0; i < claimTypes.Length; i++)
                 {
                     string type = claimTypes[i];
                     if (string.IsNullOrWhiteSpace(type))
                         continue;
-                    string? value = user.FindFirst(type.Trim())?.Value;
+                    type = type.Trim();
+                    string? value = user.FindFirst(type)?.Value;
                     if (!string.IsNullOrWhiteSpace(value))
-                        parts.Add(type.Trim() + "=" + value);
+                    {
+                        parts.Add((type, value));
+                        length = checked(length + 16 + type.Length + value.Length);
+                    }
                 }
 
                 if (parts.Count > 0)
                 {
-                    parts.Sort(StringComparer.Ordinal);
-                    return "claims:" + string.Join(';', parts);
+                    parts.Sort(static (left, right) =>
+                    {
+                        int order = StringComparer.Ordinal.Compare(left.Type, right.Type);
+                        return order != 0 ? order : StringComparer.Ordinal.Compare(left.Value, right.Value);
+                    });
+                    // Fixed-width lengths frame both fields without escaping or temporary
+                    // concatenated strings. Claim values may contain arbitrary separators.
+                    return string.Create(length, parts, static (destination, claims) =>
+                    {
+                        "claims2:".AsSpan().CopyTo(destination);
+                        destination = destination[8..];
+                        foreach ((string type, string value) in claims)
+                        {
+                            WriteClaimPart(ref destination, type);
+                            WriteClaimPart(ref destination, value);
+                        }
+                    });
                 }
             }
 
@@ -108,5 +128,13 @@ public static class DomainAuthEvaluator
         }
 
         return "auth";
+    }
+
+    private static void WriteClaimPart(ref Span<char> destination, string value)
+    {
+        value.Length.TryFormat(destination[..8], out _, "x8", System.Globalization.CultureInfo.InvariantCulture);
+        destination = destination[8..];
+        value.AsSpan().CopyTo(destination);
+        destination = destination[value.Length..];
     }
 }

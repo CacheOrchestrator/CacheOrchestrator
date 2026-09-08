@@ -79,7 +79,7 @@ The normalization lists do **not** negotiate a representation or enumerate every
 |---------|---------|-------|
 | `AuthBypassMode` | `AuthenticatedOrAuthorization` | Controls which authentication signals bypass server caching. |
 | `VaryOutputCacheByUser` | `true` | Partition by user / Authorization hash when caching auth |
-| `VaryByAuthClaims` | `null` | Claim types in auth-user material (e.g. `tenant_id`). App-specific. |
+| `VaryByAuthClaims` | `null` | Claim types defining the sharing boundary (e.g. `sub` plus `tenant_id` for per-user caching). |
 | `AuthVaryIncludeAuthorizationHash` | `true` | Fallback hash of `Authorization` when no identity |
 | `TreatAuthorizationAsAuthSignal` | `true` | `Authorization` counts for OR-mode / vary (API keys / gateways) |
 | `DataCacheRespectAuthBypass` | **`true`** | Data Cache skips when Output Cache would bypass for authentication. Set `false` only for [shared Data Cache under Output Cache auth bypass](#shared-data-cache-under-output-cache-auth-bypass). |
@@ -100,7 +100,21 @@ HTTP Data Cache includes **auth-user** in the key only when `AuthBypassMode` is 
 
 **Private dashboard (cache Output Cache and Data Cache per user):**
 
-When `VaryByAuthClaims` is set, only those claims enter `auth-user` material — the library does **not** automatically append a user id. Include a stable per-user claim (for example `sub` or `NameIdentifier`) whenever the example must separate users. Tenant-only claims share one entry across users in that tenant.
+When at least one configured `VaryByAuthClaims` claim has a nonblank value, only the available configured claims enter `auth-user` material. The library does **not** append a user id or require every configured claim to be present. Include a stable per-user claim whenever the response must separate users. Tenant-only claims share one entry across users in that tenant; the same sharing occurs with `[ "sub", "tenant_id" ]` when `sub` is missing but `tenant_id` is present.
+
+The resolver uses the following precedence when auth-user vary is enabled:
+
+| Condition | Selected identity material |
+|-----------|----------------------------|
+| Authenticated identity and at least one nonblank configured claim | Sorted type/value pairs using the first value of each configured claim type; missing claims are omitted. Both fields are length-prefixed so separators inside values cannot alias another identity. |
+| No configured claim value was selected, and authenticated `Identity.Name` is nonblank | `Identity.Name`, even when a different `sub` or `NameIdentifier` is present. |
+| Authenticated identity has no nonblank name | The `sub` claim, or `ClaimTypes.NameIdentifier` if `sub` is absent; a blank `sub` does not fall through to `NameIdentifier`. |
+| No usable identity above, `AuthVaryIncludeAuthorizationHash` is true, and the Authorization header is nonempty | A hash of the complete Authorization header. Different tokens can produce different cache entries for the same user. |
+| No material above is available | The shared sentinel `auth`. It does not identify an individual user. |
+
+These fallbacks do not independently bypass caching. With `AuthBypassMode: Never`, callers whose selected identity material is equal can share server entries, including callers who reach `auth`. `Cache-Control: private` affects downstream caches and does not separate users in Output Cache or Data Cache.
+
+Use the claim type names actually present after authentication/claim mapping; `ClaimTypes.NameIdentifier` is a URI, not the literal string `NameIdentifier`. For personalized responses, the application must ensure the selected material is present, stable and unique within the cache's sharing boundary. Enforce that contract in authentication before enabling per-user caching; otherwise retain the default authenticated-request bypass.
 
 ```json
 {

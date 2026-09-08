@@ -79,7 +79,30 @@ public class DomainAuthEvaluatorTests
         };
 
         DomainAuthEvaluator.ResolveAuthenticatedVaryKey(http, opts)
-            .Should().Be("claims:role=admin;tenant_id=acme");
+            .Should().Be("claims2:00000004role00000005admin00000009tenant_id00000004acme");
+    }
+
+    [Fact]
+    public void ResolveAuthenticatedVaryKey_ClaimValueSeparatorsCannotAliasAnotherUser()
+    {
+        DomainHttpCacheOptions options = new() { VaryByAuthClaims = ["sub", "tenant_id"] };
+        DefaultHttpContext first = new()
+        {
+            User = new ClaimsPrincipal(new ClaimsIdentity(
+                [new Claim("sub", "user;tenant_id=x"), new Claim("tenant_id", "y")], "test"))
+        };
+        DefaultHttpContext second = new()
+        {
+            User = new ClaimsPrincipal(new ClaimsIdentity(
+                [new Claim("sub", "user"), new Claim("tenant_id", "x;tenant_id=y")], "test"))
+        };
+
+        string firstKey = DomainAuthEvaluator.ResolveAuthenticatedVaryKey(first, options);
+        string secondKey = DomainAuthEvaluator.ResolveAuthenticatedVaryKey(second, options);
+
+        firstKey.Should().NotBe(secondKey);
+        DomainHttpCacheOptions reordered = new() { VaryByAuthClaims = ["tenant_id", "sub"] };
+        DomainAuthEvaluator.ResolveAuthenticatedVaryKey(first, reordered).Should().Be(firstKey);
     }
 
     [Fact]

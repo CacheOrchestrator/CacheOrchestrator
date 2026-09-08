@@ -81,14 +81,19 @@ public class NegotiationIdentityTests
         (await hit.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken)).Should().Equal(await expected.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
     }
 
-    [Fact]
-    public async Task DocumentedPerUserClaims_SeparateUsersInSameTenantAcrossOutputAndDataCache()
+    [Theory]
+    [InlineData("alice", "acme", "bob", "acme")]
+    [InlineData("user;tenant_id=x", "y", "user", "x;tenant_id=y")]
+    [InlineData("user", "x;tenant_id=y", "user;tenant_id=x", "y")]
+    public async Task DocumentedPerUserClaims_SeparateUsersAcrossOutputAndDataCache(
+        string firstUser, string firstTenant, string secondUser, string secondTenant)
     {
         await using WebApplication app = CreateApp(normalize: false, privateUsers: true);
         app.Use(async (http, next) =>
         {
             http.User = new ClaimsPrincipal(new ClaimsIdentity(
-                [new Claim("sub", http.Request.Headers["X-Test-User"].ToString()), new Claim("tenant_id", "acme")],
+                [new Claim("sub", http.Request.Headers["X-Test-User"].ToString()),
+                    new Claim("tenant_id", http.Request.Headers["X-Test-Tenant"].ToString())],
                 "test"));
             await next(http);
         });
@@ -101,10 +106,10 @@ public class NegotiationIdentityTests
         await app.StartAsync(TestContext.Current.CancellationToken);
         using HttpClient client = app.GetTestClient();
 
-        foreach (string user in new[] { "alice", "bob" })
+        foreach ((string user, string tenant) in new[] { (firstUser, firstTenant), (secondUser, secondTenant) })
         {
-            using HttpResponseMessage miss = await SendAsync(client, "/per-user-contract", "X-Test-User", user);
-            using HttpResponseMessage hit = await SendAsync(client, "/per-user-contract", "X-Test-User", user);
+            using HttpResponseMessage miss = await SendAsync(client, "/per-user-contract", "X-Test-User", user, tenant: tenant);
+            using HttpResponseMessage hit = await SendAsync(client, "/per-user-contract", "X-Test-User", user, tenant: tenant);
             string body = await miss.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
             body.Should().StartWith(user + ":");
             (await hit.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).Should().Be(body);
@@ -145,10 +150,12 @@ public class NegotiationIdentityTests
         return builder.Build();
     }
 
-    private static async Task<HttpResponseMessage> SendAsync(HttpClient client, string path, string header, string value, bool bypass = false)
+    private static async Task<HttpResponseMessage> SendAsync(HttpClient client, string path, string header, string value, bool bypass = false, string? tenant = null)
     {
         using HttpRequestMessage request = new(HttpMethod.Get, path);
         request.Headers.TryAddWithoutValidation(header, value);
+        if (tenant is not null)
+            request.Headers.TryAddWithoutValidation("X-Test-Tenant", tenant);
         if (bypass)
             request.Headers.CacheControl = new() { NoStore = true };
         return await client.SendAsync(request, TestContext.Current.CancellationToken);

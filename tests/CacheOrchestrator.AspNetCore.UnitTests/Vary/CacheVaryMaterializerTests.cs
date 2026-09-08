@@ -207,7 +207,7 @@ public class CacheVaryMaterializerTests
 
         CacheVaryMaterial material = new CacheVaryMaterializer().Build(http, opts, CacheVarySurface.OutputCache);
 
-        material.Values["auth-user"].Should().Be("claims:tenant_id=acme");
+        material.Values["auth-user"].Should().Be("claims2:00000009tenant_id00000004acme");
     }
 
     [Fact]
